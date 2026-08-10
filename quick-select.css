@@ -1,0 +1,15 @@
+/* Quick Select state */
+#quickSelectBtn.quick-on {
+  border-color: var(--good);
+  color: var(--good);
+  font-weight: 700;
+}
+
+#headerUndoBtn {
+  color: var(--warn);
+}
+
+.quick-status {
+  margin-top: 7px;
+  color: var(--good);
+}

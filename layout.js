@@ -1,0 +1,218 @@
+
+const BUILD_VERSION='0.8.0';
+const manualDraftDialog=openDraftDialog;
+const STARTER_SLOTS=[['QB',['QB']],['RB',['RB']],['RB',['RB']],['WR',['WR']],['WR',['WR']],['WR',['WR']],['TE',['TE']],['FLEX',['RB','WR','TE']],['DP',['DP']],['D/ST',['D/ST']],['K',['K']]];
+
+/* ---------- Shared state helpers ---------- */
+function ensureQuickSelectState(){if(typeof state.quickSelect!=='boolean'){state.quickSelect=true;save()}}
+function ensurePlayerFilterState(){
+  if(!state.playerFilters || typeof state.playerFilters!=='object'){
+    state.playerFilters={search:'',position:'',tier:'',status:'all'};
+  }
+}
+function ensureCollapsedManagerState(){if(!state.collapsedManagers||typeof state.collapsedManagers!=='object')state.collapsedManagers={}}
+
+function updateQuickSelectButton(){
+  const b=document.getElementById('quickSelectBtn');if(!b)return;
+  b.textContent=`Quick Select: ${state.quickSelect?'ON':'OFF'}`;
+  b.classList.toggle('quick-on',!!state.quickSelect)
+}
+function ensureHeaderDraftControls(){
+  const a=document.querySelector('.header-actions');if(!a)return;
+  if(!document.getElementById('quickSelectBtn')){
+    const b=document.createElement('button');b.id='quickSelectBtn';
+    b.onclick=()=>{state.quickSelect=!state.quickSelect;save();updateQuickSelectButton();renderWarRoom()};
+    a.prepend(b)
+  }
+  if(!document.getElementById('headerUndoBtn')){
+    const b=document.createElement('button');b.id='headerUndoBtn';b.textContent='Undo Pick';b.onclick=()=>undo();a.appendChild(b)
+  }
+  updateQuickSelectButton()
+}
+openDraftDialog=function(player){
+  ensureQuickSelectState();
+  if(state.quickSelect&&!state.keeperMode){draftPlayer(player.id,managerForPick(state.currentPick),false);return}
+  manualDraftDialog(player)
+};
+
+/* ---------- Tier grouping ---------- */
+function groupWarRoomTiers(){
+  document.querySelectorAll('.wr-tier .tier-scroll').forEach(scroll=>{
+    if(scroll.querySelector('.tier-section'))return;
+    const kids=[...scroll.children];if(!kids.length)return;
+    const frag=document.createDocumentFragment();let sec=null;
+    kids.forEach(el=>{
+      if(el.classList.contains('tier-label')){
+        const m=el.textContent.match(/Tier\s*(\d+)/i);
+        sec=document.createElement('div');sec.className='tier-section';sec.dataset.tier=m?m[1]:'unrated';
+        frag.appendChild(sec);sec.appendChild(el)
+      }else{
+        if(!sec){sec=document.createElement('div');sec.className='tier-section';sec.dataset.tier='unrated';frag.appendChild(sec)}
+        sec.appendChild(el)
+      }
+    });
+    scroll.replaceChildren(frag)
+  })
+}
+
+/* ---------- Fresh deployed player data ---------- */
+async function syncFreshPlayerData(){
+  try{
+    const r=await fetch(`players.json?v=${BUILD_VERSION}&fresh=${Date.now()}`,{cache:'no-store'});
+    if(!r.ok)return;
+    const fresh=await r.json(),saved=new Map((state.players||[]).map(p=>[p.id,p]));
+    state.players=fresh.map(p=>({...p,draftedBy:saved.get(p.id)?.draftedBy??p.draftedBy??null,isKeeper:saved.get(p.id)?.isKeeper??p.isKeeper??false}));
+    save();renderAll()
+  }catch(e){console.warn(e)}
+}
+
+/* ---------- ESPN-style roster ---------- */
+function orderedRoster(m){
+  const h=new Map((state.history||[]).map((x,i)=>[x.id,i]));
+  return roster(m).slice().sort((a,b)=>(h.get(a.id)??9999)-(h.get(b.id)??9999))
+}
+function buildLineup(m){
+  const ps=orderedRoster(m),used=new Set(),slots=STARTER_SLOTS.map(([label,eligible])=>({label,eligible,player:null}));
+  slots.filter(s=>s.label!=='FLEX').forEach(s=>{
+    const p=ps.find(x=>!used.has(x.id)&&s.eligible.includes(x.position));
+    if(p){s.player=p;used.add(p.id)}
+  });
+  const f=slots.find(s=>s.label==='FLEX'),fp=ps.find(x=>!used.has(x.id)&&f.eligible.includes(x.position));
+  if(fp){f.player=fp;used.add(fp.id)}
+  return{slots,bench:ps.filter(x=>!used.has(x.id))}
+}
+function slotHtml(label,p){
+  return `<div class="lineup-slot ${p?'filled':'empty'}"><span class="lineup-pos">${label}</span><span class="lineup-player">${p?`${p.name}${p.isKeeper?' <span class="tiny">(K)</span>':''}`:'Empty'}</span></div>`
+}
+function rosterCardHtml(m){
+  const {slots,bench}=buildLineup(m);
+  return `<div class="espn-lineup"><div class="starter-slots">${slots.map(s=>slotHtml(s.label,s.player)).join('')}</div><div class="bench-divider"><span>Bench</span><span>${Math.min(bench.length,11)}/11</span></div><div class="bench-slots">${Array.from({length:11},(_,i)=>slotHtml('BE',bench[i])).join('')}</div></div>`
+}
+
+/* ---------- War Room ---------- */
+renderWarRoom=function(){
+  ensureQuickSelectState();
+  const cur=managerForPick(state.currentPick),next=nextPickFor('High Roehler',state.currentPick),total=totalCounts(),rec=state.recommendation;
+  const tier=(p,c)=>`<div class="card wr-tier ${c}"><div class="section-title"><h3>${p}</h3><span class="tiny">Available</span></div><div class="tier-scroll">${playerRows(p,40)}</div></div>`;
+  document.getElementById('war-room').innerHTML=`<div class="war-room-layout">
+  <div class="card wr-recommendation"><div class="section-title"><div><div class="muted">Recommendation</div><div class="rec-name">${rec?.recommendation||'—'}</div></div><button id="recommendBtn" class="primary">Recommend</button></div>${rec?`<div class="confidence">Confidence ${rec.confidence}%</div><ul class="reason-list">${(rec.reason||[]).map(x=>`<li>${x}</li>`).join('')}</ul>${rec.warning?`<div class="tiny" style="margin-top:8px;color:var(--warn)">${rec.warning}</div>`:''}`:`<div class="recommendation-empty muted">Recommendation details will appear here when the decision engine is connected.</div>`}</div>
+  <div class="card wr-status-card wr-next"><div class="muted">High Roehler's Next Pick</div><div class="hero">${next?`#${next}`:'Draft complete'}</div><div>${next?`${Math.max(0,next-state.currentPick)} picks away`:''}</div></div>
+  <div class="card wr-summary"><div class="section-title"><h3>Draft Position Summary</h3><button id="targetsBtn">Edit</button></div><div class="summary">${POSITIONS.map(p=>`<span class="pill"><strong>${p}</strong> ${total[p]}/${state.targets[p]}</span>`).join('')}</div></div>
+  <div class="card wr-status-card wr-current"><div class="muted">Current Pick</div><div class="hero">#${state.currentPick}</div><div>${cur}</div><div class="tiny">Round ${roundForPick(state.currentPick)}</div><div class="quick-status tiny">${state.quickSelect?'Quick Select ON':'Quick Select OFF'}</div></div>
+  <div class="card wr-roster"><div class="section-title"><h3>Your Roster</h3><button id="undoBtn">Undo Pick</button></div>${rosterCardHtml('High Roehler')}</div>
+  ${tier('QB','wr-tier-qb')}${tier('RB','wr-tier-rb')}${tier('WR','wr-tier-wr')}${tier('TE','wr-tier-te')}</div>`;
+  document.querySelectorAll('#war-room [data-player]').forEach(el=>el.onclick=()=>openDraftDialog(state.players.find(p=>p.id===el.dataset.player)));
+  document.getElementById('undoBtn').onclick=undo;document.getElementById('targetsBtn').onclick=openTargets;document.getElementById('recommendBtn').onclick=getRecommendation;
+  groupWarRoomTiers();ensureHeaderDraftControls()
+}
+
+/* ---------- Players tab ---------- */
+const LABEL_GUIDE=[
+  ['Elite / Must Draft','Top-end player we are comfortable taking at or slightly ahead of market price.'],
+  ['Target / Strong Target','Player we actively want when the price is reasonable.'],
+  ['Fair Value / Solid Value','Good selection at expected cost; no need to reach.'],
+  ['Only If They Fall','Interesting player, but only when available below normal draft price.'],
+  ['Avoid at ADP','We dislike the current price more than we dislike the player.'],
+  ['Depth','Later-round roster depth rather than a priority selection.']
+];
+
+function openLabelsGuide(){
+  const d=document.getElementById('labelsDialog');
+  document.getElementById('labelsGuide').innerHTML=`<div class="label-guide-list">${LABEL_GUIDE.map(([name,desc])=>`<div class="label-guide-row"><span class="label-badge label-neutral">${name}</span><span>${desc}</span></div>`).join('')}</div>`;
+  d.showModal()
+}
+function resetPlayerFilters(){
+  ensurePlayerFilterState();
+  state.playerFilters={search:'',position:'',tier:'',status:'all'};
+  save();renderPlayers()
+}
+function syncFiltersFromControls(){
+  ensurePlayerFilterState();
+  state.playerFilters.search=document.getElementById('playerSearch')?.value||'';
+  state.playerFilters.position=document.getElementById('positionFilter')?.value||'';
+  state.playerFilters.tier=document.getElementById('tierFilter')?.value||'';
+  state.playerFilters.status=document.getElementById('statusFilter')?.value||'all';
+  save();renderPlayerTable()
+}
+function tierBadge(tier){
+  const t=String(tier||'').trim();
+  return t?`<span class="tier-badge tier-${t}">${t}</span>`:'—'
+}
+function labelBadge(label){
+  const txt=label||'Unrated';
+  const key=txt.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  return `<span class="label-badge label-${key}">${txt}</span>`
+}
+
+renderPlayers=function(){
+  ensurePlayerFilterState();
+  const f=state.playerFilters;
+  document.getElementById('players').innerHTML=`<div class="card players-card">
+    <div class="section-title players-title">
+      <div><h2>Available Players</h2><div class="muted">Click a player to assign the pick</div></div>
+      <button id="labelsHelpBtn">What do Our Labels mean?</button>
+    </div>
+    <div class="players-toolbar">
+      <input id="playerSearch" value="${escapeHtml(f.search)}" placeholder="Search player or NFL team">
+      <select id="positionFilter"><option value="">All positions</option>${POSITIONS.map(p=>`<option value="${p}" ${f.position===p?'selected':''}>${p}</option>`).join('')}</select>
+      <select id="tierFilter"><option value="">All tiers</option><option value="1" ${f.tier==='1'?'selected':''}>Tier 1</option><option value="2" ${f.tier==='2'?'selected':''}>Tier 2</option><option value="3" ${f.tier==='3'?'selected':''}>Tier 3</option><option value="4+" ${f.tier==='4+'?'selected':''}>Tier 4+</option></select>
+      <select id="statusFilter"><option value="all" ${f.status==='all'?'selected':''}>All players</option><option value="available" ${f.status==='available'?'selected':''}>Available only</option><option value="drafted" ${f.status==='drafted'?'selected':''}>Drafted only</option></select>
+      <button id="resetFiltersBtn">Reset Filters</button>
+    </div>
+    <div class="player-table-wrap"><div id="playerTable"></div></div>
+  </div>`;
+  ['playerSearch','positionFilter','tierFilter','statusFilter'].forEach(id=>document.getElementById(id).addEventListener('input',syncFiltersFromControls));
+  document.getElementById('resetFiltersBtn').onclick=resetPlayerFilters;
+  document.getElementById('labelsHelpBtn').onclick=openLabelsGuide;
+  renderPlayerTable()
+}
+
+renderPlayerTable=function(){
+  ensurePlayerFilterState();
+  const f=state.playerFilters;
+  const q=f.search.toLowerCase().trim();
+  const list=state.players.filter(p=>{
+    const tier=Number(p.tier)||99;
+    const tierMatch=!f.tier||(f.tier==='4+'?tier>=4:String(p.tier)===f.tier);
+    const statusMatch=f.status==='all'||(f.status==='available'&&!p.draftedBy)||(f.status==='drafted'&&!!p.draftedBy);
+    return statusMatch&&(!f.position||p.position===f.position)&&tierMatch&&(!q||`${p.name} ${p.nflTeam}`.toLowerCase().includes(q))
+  }).sort((a,b)=>(Number(a.adp)||999)-(Number(b.adp)||999)).slice(0,400);
+
+  document.getElementById('playerTable').innerHTML=`<table class="table players-table">
+    <colgroup><col class="col-player"><col class="col-pos"><col class="col-tier"><col class="col-adp"><col class="col-label"><col class="col-status"></colgroup>
+    <thead><tr><th>Player</th><th>POS</th><th>Tier</th><th>ADP</th><th>Our Label</th><th>Status</th></tr></thead>
+    <tbody>${list.map(p=>`<tr data-player="${p.id}" class="${p.draftedBy?'drafted-row':''}">
+      <td><div class="player-name-cell"><b>${p.name}</b><span>${p.nflTeam}</span></div></td>
+      <td class="center-cell">${p.position}</td>
+      <td class="center-cell">${tierBadge(p.tier)}</td>
+      <td class="center-cell">${p.adp||'—'}</td>
+      <td>${labelBadge(p.ourLabel)}</td>
+      <td>${p.draftedBy?`${p.draftedBy}${p.isKeeper?' (K)':''}`:'Available'}</td>
+    </tr>`).join('')}</tbody></table>`;
+
+  document.querySelectorAll('#playerTable [data-player]').forEach(el=>{
+    el.onclick=()=>{
+      const p=state.players.find(x=>x.id===el.dataset.player);
+      if(!p.draftedBy)openDraftDialog(p)
+    }
+  })
+}
+
+/* ---------- Draft Board ---------- */
+function toggleManagerCard(m){ensureCollapsedManagerState();state.collapsedManagers[m]=!state.collapsedManagers[m];save();renderDraftBoard()}
+renderDraftBoard=function(){
+  ensureCollapsedManagerState();
+  const others=MANAGERS.filter(m=>m!=='High Roehler');
+  document.getElementById('draft-board').innerHTML=`<div class="section-title"><div><h2>Draft Board</h2><div class="muted">Live roster view for the other managers.</div></div></div><div class="grid board-grid lineup-board">${others.map(m=>{const c=!!state.collapsedManagers[m];return `<div class="card manager-card lineup-manager-card ${c?'collapsed':''}"><div class="manager-card-head"><div class="manager-head-row"><h3>${m}</h3><button type="button" class="collapse-manager-btn" data-manager="${m}">${c?'Expand ▼':'Collapse ▲'}</button></div><div class="manager-summary">${positionSummaryText(counts(m))}</div></div><div class="manager-lineup-body">${rosterCardHtml(m)}</div></div>`}).join('')}</div>`;
+  document.querySelectorAll('.collapse-manager-btn').forEach(b=>b.onclick=()=>toggleManagerCard(b.dataset.manager))
+}
+
+/* ---------- Keep overrides active ---------- */
+const baseRenderAll=renderAll;
+renderAll=function(){baseRenderAll();renderPlayers();renderDraftBoard();ensureHeaderDraftControls();groupWarRoomTiers()}
+
+if(typeof state!=='undefined'&&state){
+  ensureQuickSelectState();ensurePlayerFilterState();ensureCollapsedManagerState();ensureHeaderDraftControls();
+  if(state.players){renderWarRoom();renderPlayers();renderDraftBoard()}
+  setTimeout(syncFreshPlayerData,50)
+}

@@ -24,7 +24,6 @@ function initialState(players){return {
   targets:{...DEFAULT_TARGETS},
   recommendation:null,
   chat:[],
-  keeperMode:false
 }}
 
 function load(){
@@ -71,12 +70,23 @@ function undo(){
 }
 function openDraftDialog(player){
   const d=document.getElementById('draftDialog');
-  document.getElementById('draftDialogTitle').textContent=`${state.keeperMode?'Assign Keeper':'Draft'}: ${player.name}`;
-  document.getElementById('draftDialogBody').innerHTML=`<div class="grid" style="grid-template-columns:repeat(3,1fr)">${MANAGERS.map(m=>`<button data-manager="${m}">${m}</button>`).join('')}</div>`;
-  document.querySelectorAll('#draftDialogBody [data-manager]').forEach(b=>b.onclick=()=>{draftPlayer(player.id,b.dataset.manager,state.keeperMode);d.close()});
+
+  document.getElementById('draftDialogTitle').textContent=`Draft: ${player.name}`;
+
+  document.getElementById('draftDialogBody').innerHTML=`
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+      ${MANAGERS.map(m=>`<button data-manager="${m}">${m}</button>`).join('')}
+    </div>`;
+
+  document.querySelectorAll('#draftDialogBody [data-manager]').forEach(b=>
+    b.onclick=()=>{
+      draftPlayer(player.id,b.dataset.manager,false);
+      d.close();
+    }
+  );
+
   d.showModal();
-}
-function playerRows(pos, limit=14){
+}function playerRows(pos, limit=14){
   const list=state.players.filter(p=>!p.draftedBy&&p.position===pos).sort((a,b)=>{
     const ta=Number(a.tier)||99,tb=Number(b.tier)||99;if(ta!==tb)return ta-tb;
     const aa=Number(a.adp)||999,ab=Number(b.adp)||999;return aa-ab;
@@ -144,11 +154,10 @@ function openTargets(){
   const d=document.getElementById('settingsDialog');document.getElementById('settingsBody').innerHTML=`<div class="grid" style="grid-template-columns:repeat(3,1fr)">${POSITIONS.map(p=>`<label>${p}<input style="width:100%;margin-top:5px" type="number" min="0" data-target="${p}" value="${state.targets[p]}"></label>`).join('')}</div><button id="saveTargets" class="primary" style="margin-top:14px">Save</button>`;
   document.getElementById('saveTargets').onclick=()=>{document.querySelectorAll('[data-target]').forEach(i=>state.targets[i.dataset.target]=Number(i.value));save();renderAll();d.close()};d.showModal();
 }
-function renderAll(){renderWarRoom();renderPlayers();renderDraftBoard();renderPlaybook();renderChat();document.getElementById('keeperBtn').textContent=state.keeperMode?'Exit Keeper Mode':'Keeper Mode';document.getElementById('keeperBtn').classList.toggle('primary',state.keeperMode)}
+function renderAll(){renderWarRoom();renderPlayers();renderDraftBoard();renderPlaybook();renderChat()}
 
 document.querySelectorAll('nav [data-page]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));document.getElementById(b.dataset.page).classList.add('active');b.classList.add('active')});
 document.getElementById('commandmentsBtn').onclick=()=>document.getElementById('commandmentsDialog').showModal();
 document.getElementById('commandmentsList').innerHTML=COMMANDMENTS.map(c=>`<li style="margin:10px 0">${c}</li>`).join('');
-document.getElementById('keeperBtn').onclick=()=>{state.keeperMode=!state.keeperMode;save();renderAll()};
 document.getElementById('resetBtn').onclick=()=>{if(confirm('Reset all draft picks, keepers, recommendations, and chat?')){localStorage.removeItem(STORAGE);location.reload()}};
 load();

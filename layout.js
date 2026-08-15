@@ -1,5 +1,5 @@
 
-const BUILD_VERSION='0.10.1';
+const BUILD_VERSION='0.15.1';
 const manualDraftDialog=openDraftDialog;
 
 const STARTER_SLOTS=[
@@ -88,7 +88,7 @@ function ensureHeaderDraftControls(){
 openDraftDialog=function(player){
   ensureQuickSelectState();
 
-  if(state.quickSelect&&!state.keeperMode){
+  if(state.quickSelect){
     draftPlayer(player.id,managerForPick(state.currentPick),false);
     return;
   }
@@ -310,6 +310,9 @@ renderWarRoom=function(){
         <div class="section-title">
           <h3>Your Roster</h3>
           <button id="undoBtn">Undo Pick</button>
+        </div>
+        <div class="your-roster-summary">
+          ${positionSummaryText(counts('High Roehler'))}
         </div>
         ${rosterCardHtml('High Roehler',false)}
       </div>
@@ -565,10 +568,14 @@ renderDraftBoard=function(){
   const others=MANAGERS.filter(m=>m!=='High Roehler');
 
   document.getElementById('draft-board').innerHTML=`
-    <div class="section-title">
+    <div class="section-title draft-board-titlebar">
       <div>
         <h2>Draft Board</h2>
         <div class="muted">Live roster view for the other managers.</div>
+      </div>
+      <div class="draft-board-global-actions">
+        <button type="button" id="collapseAllManagers">Collapse All</button>
+        <button type="button" id="expandAllManagers">Expand All</button>
       </div>
     </div>
 
@@ -628,6 +635,24 @@ renderDraftBoard=function(){
   document.querySelectorAll('.collapse-bench-btn').forEach(btn=>{
     btn.onclick=()=>toggleManagerBench(btn.dataset.manager);
   });
+
+  document.getElementById('collapseAllManagers').onclick=()=>{
+    ensureDraftBoardState();
+    MANAGERS.filter(m=>m!=='High Roehler').forEach(manager=>{
+      state.collapsedManagers[manager]=true;
+    });
+    save();
+    renderDraftBoard();
+  };
+
+  document.getElementById('expandAllManagers').onclick=()=>{
+    ensureDraftBoardState();
+    MANAGERS.filter(m=>m!=='High Roehler').forEach(manager=>{
+      state.collapsedManagers[manager]=false;
+    });
+    save();
+    renderDraftBoard();
+  };
 };
 
 /* ---------- Keep overrides active ---------- */
@@ -659,7 +684,7 @@ if(typeof state!=='undefined'&&state){
 
 
 /* ========================================================================
-   v0.10.1
+   v0.14.0
    Flexible War Room columns + temporary draft activity confirmation
    ======================================================================== */
 
@@ -704,6 +729,72 @@ function updateWarRoomColumn(slotKey,value){
   renderWarRoom();
 }
 
+
+/* ---- Keeper mechanics ---- */
+
+function keeperAtPick(pick){
+  if(!state.keepers || !pick) return null;
+
+  const manager = managerForPick(pick);
+  const round = roundForPick(pick);
+  const keeper = state.keepers[manager];
+
+  if(!keeper?.playerId || Number(keeper.round) !== round){
+    return null;
+  }
+
+  const player = state.players.find(p => p.id === keeper.playerId);
+  if(!player) return null;
+
+  return {manager, round, player, keeper};
+}
+
+function clearAppliedKeepers(){
+  state.players.forEach(player => {
+    if(player.isKeeper){
+      player.draftedBy = null;
+      player.isKeeper = false;
+    }
+  });
+}
+
+function applySavedKeepers(){
+  if(!state.keepers) return;
+
+  MANAGERS.forEach(manager => {
+    const keeper = state.keepers[manager];
+    if(!keeper?.playerId || !keeper.round) return;
+
+    const player = state.players.find(p => p.id === keeper.playerId);
+    if(!player) return;
+
+    player.draftedBy = manager;
+    player.isKeeper = true;
+  });
+}
+
+function advancePastReservedKeeperPicks(){
+  let skipped = false;
+
+  while(state.currentPick <= 264 && keeperAtPick(state.currentPick)){
+    state.currentPick++;
+    skipped = true;
+  }
+
+  return skipped;
+}
+
+/* Make "next pick" ignore a manager's already-spent keeper selection. */
+const nextPickForBeforeKeepers = nextPickFor;
+nextPickFor = function(manager, after=state.currentPick){
+  for(let pick=after; pick<=264; pick++){
+    if(managerForPick(pick) === manager && !keeperAtPick(pick)){
+      return pick;
+    }
+  }
+  return null;
+};
+
 /* ---- Draft activity confirmation ---- */
 
 let draftActivityFadeTimer = null;
@@ -736,7 +827,7 @@ function showDraftActivity(message,type='draft'){
 }
 
 /* Capture every successful pick, regardless of whether it came from
-   Quick Select, the Players tab, Keeper Mode, or manual manager selection. */
+   Quick Select, the Players tab, or manual manager selection. */
 const draftPlayerBeforeActivity = draftPlayer;
 draftPlayer = function(id,manager,isKeeper=false){
   const player = state.players.find(p => p.id === id);
@@ -745,6 +836,13 @@ draftPlayer = function(id,manager,isKeeper=false){
   draftPlayerBeforeActivity(id,manager,isKeeper);
 
   if(canDraft && player && player.draftedBy === manager){
+    /* The base draft function advances one pick. If that lands on one or
+       more keeper-reserved selections, move past them automatically. */
+    if(!isKeeper && advancePastReservedKeeperPicks()){
+      save();
+      renderAll();
+    }
+
     showDraftActivity(
       `${manager} drafted ${player.name}, ${player.position}`,
       'draft'
@@ -766,6 +864,90 @@ undo = function(){
       'undo'
     );
   }
+};
+
+
+/* ---- Late-draft required-position warning ---- */
+
+const REQUIRED_ROSTER_POSITIONS = ['QB','RB','WR','TE','DP','D/ST','K'];
+
+function remainingLivePicksFor(manager){
+  let remaining=0;
+
+  for(let pick=state.currentPick; pick<=264; pick++){
+    if(managerForPick(pick)===manager && !keeperAtPick(pick)){
+      remaining++;
+    }
+  }
+
+  return remaining;
+}
+
+function missingRequiredPositions(manager='High Roehler'){
+  const c=counts(manager);
+  return REQUIRED_ROSTER_POSITIONS.filter(pos => (c[pos]||0)===0);
+}
+
+function lateDraftRosterWarning(){
+  const picksLeft=remainingLivePicksFor('High Roehler');
+  const missing=missingRequiredPositions('High Roehler');
+
+  if(picksLeft>4 || !missing.length){
+    return null;
+  }
+
+  let level='yellow';
+  let lead='ROSTER WARNING';
+
+  if(picksLeft===3){
+    level='orange';
+  }else if(picksLeft<=2){
+    level='red';
+  }
+
+  if(picksLeft===1){
+    lead='MUST DRAFT';
+  }
+
+  return {
+    picksLeft,
+    missing,
+    level,
+    lead
+  };
+}
+
+function rosterWarningHtml(){
+  const warning=lateDraftRosterWarning();
+  if(!warning) return '';
+
+  const missingText=warning.missing.join(', ');
+  const pickWord=warning.picksLeft===1?'pick':'picks';
+
+  return `
+    <div class="late-roster-warning ${warning.level}">
+      <div class="late-roster-warning-title">⚠ ${warning.lead}</div>
+      <div class="late-roster-warning-text">
+        ${warning.picksLeft} ${pickWord} remaining · Missing ${missingText}
+      </div>
+    </div>
+  `;
+}
+
+/* Make this constraint available to the future AI decision engine too. */
+const snapshotForAIBeforeRosterWarning = snapshotForAI;
+snapshotForAI = function(){
+  const snapshot=snapshotForAIBeforeRosterWarning();
+  const warning=lateDraftRosterWarning();
+
+  snapshot.rosterRequirements={
+    requiredPositions:[...REQUIRED_ROSTER_POSITIONS],
+    missingPositions:missingRequiredPositions('High Roehler'),
+    livePicksRemaining:remainingLivePicksFor('High Roehler'),
+    lateDraftWarning:warning
+  };
+
+  return snapshot;
 };
 
 /* Replace only the War Room renderer. Players and Draft Board remain v0.9.0 behavior. */
@@ -829,6 +1011,10 @@ renderWarRoom = function(){
           <h3>Your Roster</h3>
           <button id="undoBtn">Undo Pick</button>
         </div>
+        ${rosterWarningHtml()}
+        <div class="your-roster-summary">
+          ${positionSummaryText(counts('High Roehler'))}
+        </div>
         ${rosterCardHtml('High Roehler',false)}
       </div>
 
@@ -864,3 +1050,562 @@ if(typeof state !== 'undefined' && state){
   save();
   if(state.players) renderWarRoom();
 }
+
+function renderPreDraftSetup(){
+  const body=document.getElementById('preDraftBody');
+  const order=state.draftOrder||[...MANAGERS];
+
+  if(!state.keepers||typeof state.keepers!=='object'){
+    state.keepers={};
+  }
+
+  body.innerHTML=`
+    <div class="predraft-v13">
+      <div class="predraft-v13-top">
+        <div class="muted predraft-v13-intro">Set the draft order and keeper assignments before the draft begins.</div>
+
+        <div class="predraft-v13-summary">
+          <span id="predraftOrderStatus" class="pill">12/12 managers</span>
+          <span id="predraftKeeperStatus" class="pill">0 keepers</span>
+        </div>
+      </div>
+
+      <div class="predraft-v13-grid">
+        <section class="predraft-v13-panel predraft-v13-order">
+          <div class="predraft-v13-panel-head predraft-v13-order-head">
+            <div>
+              <h3>Draft Order</h3>
+              <div class="muted">Pick 1 through 12</div>
+            </div>
+            <div class="predraft-v13-actions">
+              <button type="button" id="randomizeDraftOrder">Randomize</button>
+              <button type="button" id="resetDraftOrder">Reset</button>
+            </div>
+          </div>
+
+          <div class="predraft-v13-order-list">
+            ${Array.from({length:12},(_,i)=>`
+              <label class="predraft-v13-order-row">
+                <span class="predraft-v13-pick">${i+1}</span>
+                <select data-draft-slot="${i}">
+                  ${MANAGERS.map(manager=>`
+                    <option value="${manager}" ${order[i]===manager?'selected':''}>${manager}</option>
+                  `).join('')}
+                </select>
+              </label>
+            `).join('')}
+          </div>
+
+          <div id="draftOrderValidation" class="predraft-validation"></div>
+        </section>
+
+        <section class="predraft-v13-panel predraft-v13-keepers">
+          <div class="predraft-v13-panel-head">
+            <div>
+              <h3>Keepers</h3>
+              <div class="muted">Optional player and round cost</div>
+            </div>
+            <button type="button" id="clearKeepers">Clear</button>
+          </div>
+
+          <div class="predraft-v13-keeper-list">
+            ${MANAGERS.map(manager=>{
+              const keeper=state.keepers?.[manager]||{};
+              const currentPlayer=state.players.find(p=>p.id===keeper.playerId);
+
+              return `
+                <div class="predraft-v13-keeper-row">
+                  <div class="predraft-v13-manager">${manager}</div>
+
+                  <div class="predraft-v13-search">
+                    <input
+                      class="keeper-player-search"
+                      data-keeper-search="${manager}"
+                      value="${currentPlayer?escapeHtml(currentPlayer.name):''}"
+                      placeholder="Search player"
+                      autocomplete="off"
+                    >
+                    <div
+                      class="keeper-search-results"
+                      data-keeper-results="${manager}"
+                    ></div>
+                  </div>
+
+                  <input
+                    class="keeper-round-input"
+                    type="number"
+                    min="1"
+                    max="22"
+                    data-keeper-round="${manager}"
+                    value="${keeper.round||''}"
+                    placeholder="Rd"
+                    aria-label="${manager} keeper round"
+                  >
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </section>
+      </div>
+
+      <div class="predraft-v13-footer">
+        <div id="predraftSummary" class="muted">Review the setup, then save once.</div>
+        <button type="button" id="savePreDraftSetup" class="primary">Save Pre-Draft Setup</button>
+      </div>
+    </div>
+  `;
+
+  const readOrder=()=>[...document.querySelectorAll('[data-draft-slot]')].map(s=>s.value);
+  const keeperCount=()=>MANAGERS.filter(m=>state.keepers?.[m]?.playerId).length;
+
+  function validateOrder(){
+    const valid=new Set(readOrder()).size===MANAGERS.length;
+    const v=document.getElementById('draftOrderValidation');
+    const k=keeperCount();
+
+    v.textContent=valid?'12/12 managers assigned · No conflicts':'Each manager must appear exactly once.';
+    v.className=`predraft-validation ${valid?'valid':'invalid'}`;
+
+    document.getElementById('predraftOrderStatus').textContent=valid?'12/12 managers':'Order conflict';
+    document.getElementById('predraftKeeperStatus').textContent=`${k} keeper${k===1?'':'s'}`;
+    document.getElementById('predraftSummary').textContent=valid
+      ? `Draft order complete · ${k} keeper${k===1?'':'s'} assigned`
+      : 'Fix the draft-order conflict before saving.';
+
+    return valid;
+  }
+
+  document.querySelectorAll('[data-draft-slot]').forEach(select=>{
+    select.addEventListener('change',validateOrder);
+  });
+
+  document.getElementById('randomizeDraftOrder').onclick=()=>{
+    const shuffled=[...MANAGERS];
+    for(let i=shuffled.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
+    }
+    document.querySelectorAll('[data-draft-slot]').forEach((select,i)=>{
+      select.value=shuffled[i];
+    });
+    validateOrder();
+  };
+
+  document.getElementById('resetDraftOrder').onclick=()=>{
+    document.querySelectorAll('[data-draft-slot]').forEach((select,i)=>{
+      select.value=MANAGERS[i];
+    });
+    validateOrder();
+  };
+
+  document.querySelectorAll('[data-keeper-search]').forEach(input=>{
+    input.addEventListener('input',()=>{
+      const manager=input.dataset.keeperSearch;
+      const results=document.querySelector(`[data-keeper-results="${manager}"]`);
+      const q=input.value.trim().toLowerCase();
+
+      const selectedPlayer=state.keepers?.[manager]?.playerId
+        ? state.players.find(p=>p.id===state.keepers[manager].playerId)
+        : null;
+
+      if(selectedPlayer&&input.value.trim()!==selectedPlayer.name){
+        delete state.keepers[manager].playerId;
+      }
+
+      if(!q){
+        results.innerHTML='';
+        results.classList.remove('open');
+        validateOrder();
+        return;
+      }
+
+      const matches=state.players
+        .filter(p=>p.name.toLowerCase().includes(q))
+        .slice(0,8);
+
+      results.innerHTML=matches.map(player=>`
+        <button
+          type="button"
+          class="keeper-result"
+          data-keeper-player="${player.id}"
+          data-keeper-manager="${manager}"
+        >
+          <b>${player.name}</b>
+          <span>${player.position} · ${player.nflTeam}</span>
+        </button>
+      `).join('');
+
+      results.classList.toggle('open',matches.length>0);
+
+      results.querySelectorAll('[data-keeper-player]').forEach(button=>{
+        button.onclick=()=>{
+          const selectedManager=button.dataset.keeperManager;
+          const playerId=button.dataset.keeperPlayer;
+          const player=state.players.find(p=>p.id===playerId);
+
+          state.keepers[selectedManager]={
+            ...(state.keepers[selectedManager]||{}),
+            playerId
+          };
+
+          input.value=player?.name||'';
+          results.innerHTML='';
+          results.classList.remove('open');
+          validateOrder();
+        };
+      });
+    });
+  });
+
+  document.getElementById('clearKeepers').onclick=()=>{
+    clearAppliedKeepers();
+    state.keepers={};
+    save();
+    renderAll();
+    renderPreDraftSetup();
+  };
+
+  document.getElementById('savePreDraftSetup').onclick=()=>{
+    if(!validateOrder()) return;
+
+    const usedPlayers=new Set();
+    let valid=true;
+    let message='';
+
+    MANAGERS.forEach(manager=>{
+      const keeper=state.keepers[manager];
+      const roundInput=document.querySelector(`[data-keeper-round="${manager}"]`);
+      const round=Number(roundInput?.value||0);
+
+      if(!keeper?.playerId){
+        if(roundInput) roundInput.value='';
+        delete state.keepers[manager];
+        return;
+      }
+
+      if(usedPlayers.has(keeper.playerId)){
+        valid=false;
+        message='A player cannot be assigned as keeper to more than one manager.';
+        return;
+      }
+
+      usedPlayers.add(keeper.playerId);
+
+      if(!Number.isInteger(round)||round<1||round>22){
+        valid=false;
+        message=`${manager} needs a keeper round from 1 through 22.`;
+        return;
+      }
+
+      keeper.round=round;
+    });
+
+    if(!valid){
+      alert(message);
+      return;
+    }
+
+    state.draftOrder=readOrder();
+    clearAppliedKeepers();
+    applySavedKeepers();
+    advancePastReservedKeeperPicks();
+
+    save();
+    document.getElementById('preDraftDialog').close();
+    renderAll();
+  };
+
+  validateOrder();
+}
+document.getElementById('preDraftBtn').onclick = () => {
+  renderPreDraftSetup();
+  document.getElementById('preDraftDialog').showModal();
+};
+
+/* Re-apply persisted keeper assignments after a refresh/fresh players.json sync. */
+if(typeof state !== 'undefined' && state?.players){
+  if(state.keepers && Object.keys(state.keepers).length){
+    applySavedKeepers();
+    advancePastReservedKeeperPicks();
+    save();
+    renderAll();
+  }
+}
+
+
+/* ==========================================================================
+   NEW MOCK WORKFLOW — v0.14.0
+   ========================================================================== */
+
+function ensureNewMockDialog(){
+  let dialog=document.getElementById('newMockDialog');
+  if(dialog) return dialog;
+
+  dialog=document.createElement('dialog');
+  dialog.id='newMockDialog';
+  dialog.innerHTML=`
+    <div class="dialog-head">
+      <div>
+        <h2>Start New Mock</h2>
+        <div class="muted">Choose what you want to keep from the current setup.</div>
+      </div>
+      <button type="button" id="closeNewMockDialog">Close</button>
+    </div>
+
+    <div class="new-mock-options">
+      <button type="button" class="new-mock-option primary-option" id="newMockKeepSetup">
+        <span class="new-mock-option-title">Keep Pre-Draft Setup</span>
+        <span class="new-mock-option-text">
+          Keep the current draft order and keepers, but clear all live draft picks and start again.
+        </span>
+      </button>
+
+      <button type="button" class="new-mock-option danger-option" id="newMockResetEverything">
+        <span class="new-mock-option-title">Reset Everything</span>
+        <span class="new-mock-option-text">
+          Clear the draft, draft order, and all keeper assignments for a completely fresh setup.
+        </span>
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+
+  document.getElementById('closeNewMockDialog').onclick=()=>dialog.close();
+  document.getElementById('newMockKeepSetup').onclick=()=>{
+    dialog.close();
+    startNewMock(true);
+  };
+  document.getElementById('newMockResetEverything').onclick=()=>{
+    if(!confirm('Reset the entire mock AND all Pre-Draft setup?')){
+      return;
+    }
+    dialog.close();
+    startNewMock(false);
+  };
+
+  return dialog;
+}
+
+function clearLiveDraftAssignments(){
+  state.players.forEach(player=>{
+    player.draftedBy=null;
+    player.isKeeper=false;
+  });
+
+  state.currentPick=1;
+  state.history=[];
+  state.recommendation=null;
+  state.chat=[];
+
+  /* Return the live War Room to its normal starting view. */
+  state.warRoomColumns={flexA:'QB',flexB:'TE'};
+  state.quickSelect=true;
+
+  /* A new mock should open the Draft Board cleanly collapsed. */
+  state.collapsedManagers={};
+  state.collapsedBenches={};
+  ensureDraftBoardState();
+
+  /* Player-table filters are convenience preferences, not draft state.
+     Keep them, but always hide drafted players on a fresh mock. */
+  ensurePlayerFilterState();
+  state.playerFilters.includeDrafted=false;
+}
+
+function startNewMock(keepPreDraftSetup){
+  clearLiveDraftAssignments();
+
+  if(keepPreDraftSetup){
+    if(!state.keepers || typeof state.keepers!=='object'){
+      state.keepers={};
+    }
+
+    applySavedKeepers();
+    advancePastReservedKeeperPicks();
+  }else{
+    state.draftOrder=[...MANAGERS];
+    state.keepers={};
+  }
+
+  save();
+
+  const activity=document.getElementById('draftActivity');
+  if(activity){
+    activity.textContent='';
+    activity.classList.remove('active','fading','undo');
+  }
+
+  renderAll();
+
+  showDraftActivity(
+    keepPreDraftSetup
+      ? 'New mock started · Pre-Draft setup kept'
+      : 'New mock started · Pre-Draft setup cleared',
+    'draft'
+  );
+}
+
+function configureNewMockButton(){
+  const button=document.getElementById('resetBtn');
+  if(!button) return;
+
+  button.textContent='New Mock';
+  button.classList.remove('danger');
+
+  button.onclick=()=>{
+    ensureNewMockDialog().showModal();
+  };
+}
+
+/* app.js creates the old Reset Draft handler first; layout.js loads afterward,
+   so this intentionally replaces that behavior. */
+configureNewMockButton();
+
+
+/* ==========================================================================
+   START LIVE DRAFT — v0.15.1
+   ========================================================================== */
+
+function liveDraftIsActive(){
+  return state.draftMode === 'live';
+}
+
+function liveDraftKeeperCount(){
+  return MANAGERS.filter(manager => state.keepers?.[manager]?.playerId).length;
+}
+
+function highRoehlerDraftSlot(){
+  const index=(state.draftOrder||[]).indexOf('High Roehler');
+  return index >= 0 ? index + 1 : null;
+}
+
+function firstLivePick(){
+  let pick=1;
+  while(pick<=264 && keeperAtPick(pick)) pick++;
+  return pick;
+}
+
+function updateLiveDraftButton(){
+  const button=document.getElementById('startLiveDraftBtn');
+  if(!button) return;
+
+  if(liveDraftIsActive()){
+    button.textContent='Live Draft Active';
+    button.disabled=true;
+    button.classList.add('live-active');
+  }else{
+    button.textContent='Start Live Draft';
+    button.disabled=false;
+    button.classList.remove('live-active');
+  }
+}
+
+function ensureStartLiveDraftButton(){
+  const button=document.getElementById('startLiveDraftBtn');
+  if(!button) return;
+  button.onclick=()=>openStartLiveDraftDialog();
+  updateLiveDraftButton();
+}
+
+function ensureStartLiveDraftDialog(){
+  let dialog=document.getElementById('startLiveDraftDialog');
+  if(dialog) return dialog;
+  dialog=document.createElement('dialog');
+  dialog.id='startLiveDraftDialog';
+  document.body.appendChild(dialog);
+  return dialog;
+}
+
+function openStartLiveDraftDialog(){
+  const dialog=ensureStartLiveDraftDialog();
+  const slot=highRoehlerDraftSlot();
+  const keeperCount=liveDraftKeeperCount();
+  const next=firstLivePick();
+  const firstManager=managerForPick(next);
+
+  dialog.innerHTML=`
+    <div class="dialog-head">
+      <div>
+        <h2>Start Live Draft</h2>
+        <div class="muted">This clears mock-draft activity and locks in the current Pre-Draft setup.</div>
+      </div>
+      <button type="button" id="closeStartLiveDraft">Close</button>
+    </div>
+    <div class="live-draft-checklist">
+      <div class="live-draft-check-row"><span>High Roehler draft slot</span><strong>${slot?`Pick ${slot}`:'Not assigned'}</strong></div>
+      <div class="live-draft-check-row"><span>Managers assigned</span><strong>${new Set(state.draftOrder||[]).size}/12</strong></div>
+      <div class="live-draft-check-row"><span>Keepers configured</span><strong>${keeperCount}</strong></div>
+      <div class="live-draft-check-row"><span>First live selection</span><strong>#${next} · ${firstManager}</strong></div>
+    </div>
+    <div class="live-draft-warning">Starting the live draft will remove all mock selections, history, recommendations, and chat. Your draft order and keepers will be preserved.</div>
+    <label class="live-draft-confirm-line"><input type="checkbox" id="liveDraftConfirm"><span>I verified the draft order and keepers.</span></label>
+    <div class="live-draft-dialog-actions">
+      <button type="button" id="cancelStartLiveDraft">Cancel</button>
+      <button type="button" id="confirmStartLiveDraft" class="primary" disabled>Start Live Draft</button>
+    </div>`;
+
+  const checkbox=document.getElementById('liveDraftConfirm');
+  const confirmButton=document.getElementById('confirmStartLiveDraft');
+  checkbox.onchange=()=>{confirmButton.disabled=!checkbox.checked;};
+  document.getElementById('closeStartLiveDraft').onclick=()=>dialog.close();
+  document.getElementById('cancelStartLiveDraft').onclick=()=>dialog.close();
+  confirmButton.onclick=()=>{
+    const assigned=new Set(state.draftOrder||[]);
+    if(assigned.size!==12 || !(state.draftOrder||[]).includes('High Roehler')){
+      alert('The Draft Order must contain all 12 managers exactly once before starting the live draft.');
+      return;
+    }
+    dialog.close();
+    startLiveDraft();
+  };
+  dialog.showModal();
+}
+
+function startLiveDraft(){
+  clearLiveDraftAssignments();
+  state.draftMode='live';
+  state.liveDraftStartedAt=new Date().toISOString();
+  applySavedKeepers();
+  advancePastReservedKeeperPicks();
+  save();
+  renderAll();
+  updateLiveDraftButton();
+  const manager=managerForPick(state.currentPick);
+  showDraftActivity(`LIVE DRAFT READY · Pick #${state.currentPick}: ${manager}`,'draft');
+}
+
+/* Wrap New Mock so live-draft mode gets a stronger warning and is exited cleanly. */
+const startNewMockBeforeLiveDraft=startNewMock;
+startNewMock=function(keepPreDraftSetup){
+  state.draftMode='mock';
+  state.liveDraftStartedAt=null;
+  startNewMockBeforeLiveDraft(keepPreDraftSetup);
+  updateLiveDraftButton();
+};
+
+function protectNewMockDuringLiveDraft(){
+  const button=document.getElementById('resetBtn');
+  if(!button) return;
+  button.textContent='New Mock';
+  button.classList.remove('danger');
+  button.onclick=()=>{
+    if(liveDraftIsActive()){
+      const proceed=confirm('LIVE DRAFT IS ACTIVE. Starting a new mock will clear the live draft progress. Continue?');
+      if(!proceed) return;
+    }
+    ensureNewMockDialog().showModal();
+  };
+}
+
+/* Re-bind these static header controls after every render. */
+const ensureHeaderDraftControlsBeforeLiveDraft=ensureHeaderDraftControls;
+ensureHeaderDraftControls=function(){
+  ensureHeaderDraftControlsBeforeLiveDraft();
+  ensureStartLiveDraftButton();
+  protectNewMockDuringLiveDraft();
+};
+
+ensureStartLiveDraftButton();
+protectNewMockDuringLiveDraft();
+updateLiveDraftButton();

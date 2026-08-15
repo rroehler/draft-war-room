@@ -1,0 +1,4 @@
+Add these immediately AFTER layout.js and before </body>:
+
+<script src="config.js?v=0.16.0"></script>
+<script src="ai-engine.js?v=0.16.0"></script>

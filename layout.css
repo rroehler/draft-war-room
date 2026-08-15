@@ -1,5 +1,5 @@
 
-/* Draft War Room v0.10.1 */
+/* Draft War Room layout.css v0.15.1 */
 
 #war-room{--wr-gap:12px}
 #war-room .notice{display:none}
@@ -509,3 +509,569 @@ header .header-actions{
     order:3;
   }
 }
+
+/* ==========================================================================
+   PRE-DRAFT v0.14.0
+   ========================================================================== */
+
+#preDraftDialog{
+  width:880px !important;
+  max-width:calc(100vw - 32px) !important;
+  max-inline-size:none !important;
+  box-sizing:border-box !important;
+  padding:14px !important;
+  overflow:hidden !important;
+}
+
+#preDraftDialog .dialog-head{
+  margin-bottom:10px;
+}
+
+#preDraftDialog #preDraftBody{
+  width:100% !important;
+  min-width:0 !important;
+  max-width:none !important;
+  max-height:calc(100vh - 135px);
+  overflow-y:auto;
+  overflow-x:hidden;
+  box-sizing:border-box;
+  padding-right:3px;
+}
+
+.predraft-v13{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  width:100%;
+  min-width:0;
+}
+
+.predraft-v13-top{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.predraft-v13-top h2,
+.predraft-v13-panel h3{
+  margin:0;
+}
+
+.predraft-v13-summary,
+.predraft-v13-actions{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+}
+
+/* Force the two sections side-by-side on laptop/desktop. */
+.predraft-v13-grid{
+  display:grid !important;
+  grid-template-columns:300px 1fr !important;
+  gap:12px !important;
+  align-items:start !important;
+  width:100% !important;
+  min-width:0 !important;
+}
+
+.predraft-v13-panel{
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+  padding:11px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--panel);
+}
+
+.predraft-v13-panel-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:8px;
+}
+
+/* Draft order */
+.predraft-v13-order-list{
+  display:grid;
+  gap:4px;
+  width:100%;
+  min-width:0;
+}
+
+.predraft-v13-order-row{
+  display:grid;
+  grid-template-columns:30px minmax(0,1fr);
+  gap:6px;
+  align-items:center;
+  width:100%;
+  min-width:0;
+}
+
+.predraft-v13-pick{
+  display:grid;
+  place-items:center;
+  height:30px;
+  width:30px;
+  box-sizing:border-box;
+  border:1px solid var(--line);
+  border-radius:7px;
+  background:#182238;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:800;
+}
+
+/* Keepers */
+.predraft-v13-keeper-list{
+  display:grid;
+  gap:4px;
+  width:100%;
+  min-width:0;
+}
+
+.predraft-v13-keeper-row{
+  display:grid;
+  grid-template-columns:96px minmax(0,1fr) 48px;
+  gap:6px;
+  align-items:center;
+  width:100%;
+  min-width:0;
+}
+
+.predraft-v13-manager{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:10px;
+  font-weight:700;
+}
+
+.predraft-v13-search{
+  position:relative;
+  width:100%;
+  min-width:0;
+}
+
+/* Controls */
+#preDraftDialog select,
+#preDraftDialog input{
+  display:block;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:100% !important;
+  height:30px !important;
+  box-sizing:border-box !important;
+  margin:0 !important;
+  padding:4px 7px !important;
+  border:1px solid var(--line) !important;
+  border-radius:7px !important;
+  background:#182238 !important;
+  color:var(--text) !important;
+  box-shadow:none !important;
+  font:inherit;
+}
+
+#preDraftDialog select:hover,
+#preDraftDialog select:focus,
+#preDraftDialog input:hover,
+#preDraftDialog input:focus{
+  border-color:var(--accent) !important;
+  outline:none !important;
+}
+
+#preDraftDialog option{
+  background:#182238;
+  color:#eef3ff;
+}
+
+#preDraftDialog .keeper-round-input{
+  width:48px !important;
+  min-width:48px !important;
+  max-width:48px !important;
+  text-align:center !important;
+  padding-left:2px !important;
+  padding-right:2px !important;
+}
+
+/* Keeper search popup */
+#preDraftDialog .keeper-search-results{
+  display:none;
+  position:absolute !important;
+  left:0 !important;
+  right:0 !important;
+  top:calc(100% + 3px) !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:100% !important;
+  max-height:190px;
+  overflow-y:auto !important;
+  box-sizing:border-box !important;
+  padding:4px;
+  border:1px solid var(--line);
+  border-radius:7px;
+  background:#121a2e;
+  box-shadow:0 10px 24px rgba(0,0,0,.35);
+  z-index:50;
+}
+
+#preDraftDialog .keeper-search-results.open{
+  display:grid;
+  gap:3px;
+}
+
+#preDraftDialog .keeper-result{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) auto !important;
+  gap:6px !important;
+  align-items:center !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:100% !important;
+  box-sizing:border-box !important;
+  text-align:left;
+}
+
+#preDraftDialog .keeper-result b,
+#preDraftDialog .keeper-result span{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+#preDraftDialog .keeper-result span{
+  color:var(--muted);
+  font-size:9px;
+}
+
+#preDraftDialog .predraft-validation{
+  min-height:14px;
+  margin-top:6px;
+  font-size:9px;
+  font-weight:700;
+}
+
+#preDraftDialog .predraft-validation.valid{color:var(--good)}
+#preDraftDialog .predraft-validation.invalid{color:var(--warn)}
+
+.predraft-v13-footer{
+  position:sticky;
+  bottom:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  width:100%;
+  box-sizing:border-box;
+  padding:9px 10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#121a2e;
+  box-shadow:0 -5px 16px rgba(0,0,0,.16);
+  z-index:20;
+}
+
+.predraft-v13-footer .primary{
+  min-width:175px;
+}
+
+/* Only stack when the viewport itself is small. */
+@media(max-width:720px){
+  #preDraftDialog{
+    width:calc(100vw - 20px) !important;
+    max-width:calc(100vw - 20px) !important;
+    padding:10px !important;
+  }
+
+  .predraft-v13-grid{
+    grid-template-columns:1fr !important;
+  }
+
+  .predraft-v13-top,
+  .predraft-v13-footer{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .predraft-v13-footer .primary{
+    width:100%;
+  }
+}
+
+
+/* ==========================================================================
+   PRE-DRAFT v0.13.1 POLISH
+   ========================================================================== */
+
+#preDraftDialog{
+  width:920px !important;
+}
+
+/* The dialog title already says Pre-Draft Setup, so body starts with a compact intro. */
+#preDraftDialog .predraft-v13-top{
+  align-items:center;
+  min-height:28px;
+}
+
+#preDraftDialog .predraft-v13-intro{
+  font-size:12px;
+}
+
+/* Give Draft Order just enough extra room without bloating the modal. */
+#preDraftDialog .predraft-v13-grid{
+  grid-template-columns:340px minmax(0,1fr) !important;
+}
+
+/* Keep Draft Order controls compact and make Randomize / Reset a single row. */
+#preDraftDialog .predraft-v13-order-head{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:7px;
+}
+
+#preDraftDialog .predraft-v13-order-head .predraft-v13-actions{
+  justify-content:flex-start;
+  flex-wrap:nowrap;
+}
+
+#preDraftDialog .predraft-v13-order-head .predraft-v13-actions button{
+  padding:5px 9px;
+  min-height:28px;
+}
+
+/* Tighten row spacing so all 12 managers fit comfortably on a laptop. */
+#preDraftDialog .predraft-v13-order-list,
+#preDraftDialog .predraft-v13-keeper-list{
+  gap:3px;
+}
+
+#preDraftDialog .predraft-v13-pick{
+  height:27px;
+  width:29px;
+}
+
+#preDraftDialog .predraft-v13-order-row{
+  grid-template-columns:29px minmax(0,1fr);
+  gap:5px;
+}
+
+#preDraftDialog select,
+#preDraftDialog input{
+  height:27px !important;
+  padding:3px 6px !important;
+  font-size:11px;
+}
+
+#preDraftDialog .predraft-v13-keeper-row{
+  grid-template-columns:96px minmax(0,1fr) 46px;
+  gap:5px;
+}
+
+#preDraftDialog .keeper-round-input{
+  width:46px !important;
+  min-width:46px !important;
+  max-width:46px !important;
+}
+
+#preDraftDialog .predraft-v13-panel{
+  padding:10px;
+}
+
+#preDraftDialog .predraft-v13-panel-head{
+  margin-bottom:6px;
+}
+
+/* Slightly slimmer footer while retaining the sticky save action. */
+#preDraftDialog .predraft-v13-footer{
+  padding:7px 9px;
+}
+
+#preDraftDialog .predraft-v13-footer .primary{
+  min-width:170px;
+  padding-top:7px;
+  padding-bottom:7px;
+}
+
+
+/* ==========================================================================
+   NEW MOCK DIALOG — v0.14.0
+   ========================================================================== */
+
+#newMockDialog{
+  width:min(570px,calc(100vw - 28px));
+  max-width:570px;
+}
+
+#newMockDialog .dialog-head h2{
+  margin:0 0 3px;
+}
+
+.new-mock-options{
+  display:grid;
+  gap:10px;
+  margin-top:12px;
+}
+
+.new-mock-option{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:4px;
+  width:100%;
+  padding:14px 15px;
+  text-align:left;
+  border-radius:11px;
+}
+
+.new-mock-option-title{
+  font-size:14px;
+  font-weight:800;
+}
+
+.new-mock-option-text{
+  font-size:11px;
+  line-height:1.45;
+  color:var(--muted);
+  font-weight:400;
+}
+
+.new-mock-option.primary-option{
+  border-color:rgba(109,168,255,.55);
+  background:rgba(109,168,255,.09);
+}
+
+.new-mock-option.primary-option:hover{
+  background:rgba(109,168,255,.15);
+}
+
+.new-mock-option.danger-option{
+  border-color:rgba(255,107,122,.45);
+  background:rgba(255,107,122,.06);
+}
+
+.new-mock-option.danger-option:hover{
+  background:rgba(255,107,122,.11);
+}
+
+
+/* ==========================================================================
+   v0.14.1 — roster summary + Draft Board global controls
+   ========================================================================== */
+
+.your-roster-summary{
+  margin:-1px 0 8px;
+  padding:6px 8px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:rgba(28,38,65,.42);
+  color:var(--muted);
+  font-size:9px;
+  line-height:1.45;
+  white-space:normal;
+}
+
+.your-roster-summary strong{
+  color:var(--text);
+}
+
+.draft-board-titlebar{
+  align-items:flex-end;
+}
+
+.draft-board-global-actions{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex-wrap:wrap;
+}
+
+.draft-board-global-actions button{
+  padding:6px 9px;
+  font-size:10px;
+}
+
+@media(max-width:700px){
+  .draft-board-titlebar{
+    align-items:stretch;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .draft-board-global-actions{
+    width:100%;
+  }
+
+  .draft-board-global-actions button{
+    flex:1;
+  }
+}
+
+
+/* ==========================================================================
+   v0.14.3 — late-draft required-position warnings
+   ========================================================================== */
+
+.late-roster-warning{
+  margin:0 0 8px;
+  padding:8px 9px;
+  border:1px solid;
+  border-radius:8px;
+  line-height:1.3;
+}
+
+.late-roster-warning-title{
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.045em;
+}
+
+.late-roster-warning-text{
+  margin-top:2px;
+  font-size:10px;
+  font-weight:700;
+}
+
+.late-roster-warning.yellow{
+  background:rgba(255,200,87,.10);
+  border-color:rgba(255,200,87,.45);
+  color:#ffe1a0;
+}
+
+.late-roster-warning.orange{
+  background:rgba(255,153,64,.12);
+  border-color:rgba(255,153,64,.58);
+  color:#ffc07a;
+}
+
+.late-roster-warning.red{
+  background:rgba(255,107,122,.12);
+  border-color:rgba(255,107,122,.60);
+  color:#ffabb4;
+}
+
+.late-roster-warning.red .late-roster-warning-title{
+  font-size:11px;
+}
+
+
+/* ==========================================================================\n   START LIVE DRAFT — v0.15.1\n   ========================================================================== */
+.start-live-draft-btn{border-color:rgba(85,214,139,.55);color:var(--good);background:rgba(85,214,139,.08);font-weight:800}
+.start-live-draft-btn:hover:not(:disabled){background:rgba(85,214,139,.14)}
+.start-live-draft-btn.live-active,.start-live-draft-btn:disabled{border-color:rgba(85,214,139,.42);color:var(--good);background:rgba(85,214,139,.10);opacity:.82;cursor:default}
+#startLiveDraftDialog{width:min(560px,calc(100vw - 28px));max-width:560px}
+#startLiveDraftDialog .dialog-head h2{margin:0 0 3px}
+.live-draft-checklist{display:grid;gap:6px;margin-top:12px}
+.live-draft-check-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:rgba(28,38,65,.42);font-size:11px}
+.live-draft-check-row span{color:var(--muted)}
+.live-draft-check-row strong{text-align:right}
+.live-draft-warning{margin-top:12px;padding:10px 11px;border:1px solid rgba(255,200,87,.42);border-radius:8px;background:rgba(255,200,87,.08);color:#ffe1a0;font-size:11px;line-height:1.45}
+.live-draft-confirm-line{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:11px;font-weight:700}
+.live-draft-confirm-line input{width:auto;margin:0;accent-color:var(--accent)}
+.live-draft-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+@media(max-width:650px){.live-draft-dialog-actions{flex-direction:column-reverse}.live-draft-dialog-actions button{width:100%}}

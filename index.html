@@ -188,11 +188,12 @@
     </dialog>
 
 
-    <script>
-        const dwrBuild = Date.now();
+   <script>
+    const dwrBuild = Date.now();
 
         document.write(`<script src="app.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="layout.js?v=${dwrBuild}"><\/script>`);
+        document.write(`<script src="players-sort.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="config.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="ai-engine.js?v=${dwrBuild}"><\/script>`);
     </script>

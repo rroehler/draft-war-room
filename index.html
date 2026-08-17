@@ -50,9 +50,14 @@
   <div id="preDraftBody"><div class="muted">Pre-Draft setup controls will go here.</div></div>
 </dialog>
 
-<script src="app.js?v=0.15.1"></script>
-<script src="layout.js?v=0.15.1"></script>
-<script src="config.js?v=0.16.1"></script>
-<script src="ai-engine.js?v=0.16.1"></script>
+<script>
+  const dwrBuild = Date.now();
+
+  document.write(`<script src="app.js?v=${dwrBuild}"><\/script>`);
+  document.write(`<script src="layout.js?v=${dwrBuild}"><\/script>`);
+  document.write(`<script src="config.js?v=${dwrBuild}"><\/script>`);
+  document.write(`<script src="ai-engine.js?v=${dwrBuild}"><\/script>`);
+</script>
+
 </body>
 </html>

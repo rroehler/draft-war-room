@@ -1,6 +1,6 @@
 /* ==========================================================================
-   Draft War Room — AI Decision Engine v1
-   Fast-track version for 2026 draft week.
+   Draft War Room — AI Decision Engine v1.2
+   Overall Rank + snake-turn awareness for 2026 draft week.
    ========================================================================== */
 
 (function(){
@@ -12,6 +12,8 @@
       name:p.name,
       team:p.nflTeam,
       pos:p.position,
+      rank:p.rank || null,
+      posRank:p.posRank || null,
       tier:p.tier || null,
       adp:p.adp || null,
       label:p.ourLabel || 'Unrated',
@@ -20,6 +22,8 @@
   }
 
   function sortAvailable(a,b){
+    const ra=Number(a.rank)||9999, rb=Number(b.rank)||9999;
+    if(ra!==rb) return ra-rb;
     const ta=Number(a.tier)||99, tb=Number(b.tier)||99;
     if(ta!==tb) return ta-tb;
     return (Number(a.adp)||9999)-(Number(b.adp)||9999);
@@ -50,6 +54,8 @@
         manager:h.manager,
         player:p?.name || h.id,
         pos:p?.position || null,
+        rank:p?.rank || null,
+        posRank:p?.posRank || null,
         tier:p?.tier || null,
         adp:p?.adp || null,
         keeper:!!h.isKeeper
@@ -79,7 +85,7 @@
     const chosen=new Map();
 
     /* Broad overall board */
-    all.slice(0,100).forEach(p=>chosen.set(p.id,p));
+    all.slice(0,120).forEach(p=>chosen.set(p.id,p));
 
     /* Guarantee useful positional depth, even late in the draft. */
     const limits={QB:16,RB:28,WR:32,TE:16,DP:14,'D/ST':12,K:12};
@@ -91,24 +97,100 @@
     return [...chosen.values()].sort(sortAvailable).map(compactPlayer);
   }
 
-  function picksBeforeNextUserPick(){
-    const next = nextPickFor('High Roehler',state.currentPick);
-    if(!next) return [];
+  function fallbackTurnContext(){
+    const USER='High Roehler';
+    const currentPick=state.currentPick;
+    const currentManager=managerForPick(currentPick);
+    const currentPickIsUser=currentManager===USER;
 
-    const result=[];
-    for(let pick=state.currentPick; pick<next && pick<=264; pick++){
-      result.push({
-        pick,
-        round:roundForPick(pick),
-        manager:managerForPick(pick),
-        reservedKeeper:typeof keeperAtPick==='function' ? !!keeperAtPick(pick) : false
-      });
+    const isReserved=pick=>
+      typeof keeperAtPick==='function' && !!keeperAtPick(pick);
+
+    const nextLiveFor=(manager,start)=>{
+      for(let pick=Math.max(1,start);pick<=264;pick++){
+        if(!isReserved(pick) && managerForPick(pick)===manager){
+          return pick;
+        }
+      }
+      return null;
+    };
+
+    const liveBetween=(start,end)=>{
+      const result=[];
+      for(let pick=start;pick<end && pick<=264;pick++){
+        if(isReserved(pick)) continue;
+        result.push({
+          pick,
+          round:roundForPick(pick),
+          manager:managerForPick(pick),
+          reservedKeeper:false
+        });
+      }
+      return result;
+    };
+
+    const start=currentPickIsUser?currentPick+1:currentPick;
+    const nextUserPick=nextLiveFor(USER,start);
+    const beforeNext=nextUserPick
+      ? liveBetween(start,nextUserPick)
+      : [];
+    const oppBeforeNext=beforeNext.filter(p=>p.manager!==USER);
+
+    const currentTurnPicks=[];
+    let followingUserPickAfterTurn=null;
+    let oppBeforeFollowing=[];
+
+    if(currentPickIsUser){
+      currentTurnPicks.push(currentPick);
+      let last=currentPick;
+
+      while(true){
+        const candidate=nextLiveFor(USER,last+1);
+        if(!candidate) break;
+
+        const between=liveBetween(last+1,candidate);
+        const opposing=between.filter(p=>p.manager!==USER);
+
+        if(opposing.length===0){
+          currentTurnPicks.push(candidate);
+          last=candidate;
+        }else{
+          followingUserPickAfterTurn=candidate;
+          oppBeforeFollowing=opposing;
+          break;
+        }
+      }
     }
-    return result;
+
+    return {
+      currentPick,
+      currentManager,
+      currentPickIsUser,
+      nextUserPick,
+      picksUntilNextUserPick:nextUserPick
+        ? nextUserPick-currentPick
+        : null,
+      livePicksBeforeNextUser:beforeNext,
+      opponentLivePicksBeforeNextUser:oppBeforeNext,
+      opponentLivePickCountBeforeNextUser:oppBeforeNext.length,
+      currentTurnPicks,
+      currentTurnPickCount:currentTurnPicks.length,
+      isBackToBackTurn:currentTurnPicks.length>1,
+      followingUserPickAfterTurn,
+      opponentLivePicksBeforeFollowingTurn:oppBeforeFollowing,
+      opponentLivePickCountBeforeFollowingTurn:oppBeforeFollowing.length
+    };
+  }
+
+  function getTurnContext(){
+    return typeof window.DWR_getUserTurnContext==='function'
+      ? window.DWR_getUserTurnContext()
+      : fallbackTurnContext();
   }
 
   function enhancedSnapshotForAI(){
-    const nextUserPick=nextPickFor('High Roehler',state.currentPick);
+    const turn=getTurnContext();
+    const nextUserPick=turn.nextUserPick;
     const currentManager=managerForPick(state.currentPick);
     const myCounts=counts('High Roehler');
 
@@ -137,7 +219,7 @@
         team:'High Roehler',
         commandments:[...COMMANDMENTS],
         priorities:[
-          'Use tiers and our board to determine value; use ADP mainly to estimate whether a player will survive.',
+          'Use Overall Rank as the primary cross-position value board. Tier marks value cliffs, Our Label adds conviction/context, Position Rank gives within-position context, and ADP mainly estimates whether a player will survive.',
           'Do not force a preset positional round plan.',
           'Three starting WR plus FLEX makes WR depth important, but do not pass superior value.',
           'Do not chase runs automatically; decide whether to join or exploit them.',
@@ -153,8 +235,9 @@
         currentManager,
         draftOrder:[...state.draftOrder],
         nextUserPick,
-        picksUntilUser:nextUserPick ? Math.max(0,nextUserPick-state.currentPick) : null,
-        managersBeforeNextUserPick:picksBeforeNextUserPick(),
+        picksUntilUser:turn.picksUntilNextUserPick,
+        managersBeforeNextUserPick:turn.livePicksBeforeNextUser,
+        userTurn:turn,
         recentPicks:recentDraftPicks(24),
         recent12PositionCounts:recentPositionRun(),
         keepers:currentKeeperSummary()
@@ -255,5 +338,5 @@
     renderChat();
   };
 
-  console.log('Draft War Room AI Decision Engine v1 loaded.');
+  console.log('Draft War Room AI Decision Engine v1.2 — Overall Rank + snake-turn awareness loaded.');
 })();

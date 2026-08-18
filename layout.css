@@ -1114,3 +1114,96 @@ header .header-actions{
     grid-template-columns:1fr;
   }
 }
+
+/* ========================================================================== 
+   Players Tab — Overall Rank + readability v0.15.3
+   ========================================================================== */
+
+.players-card{
+  width:min(1180px,100%);
+}
+
+.players-toolbar.players-toolbar-sorted{
+  grid-template-columns:
+    minmax(245px,1.7fr)
+    110px
+    110px
+    165px
+    minmax(175px,auto)
+    auto;
+  font-size:12.5px;
+}
+
+#sortByFilter{
+  width:100%;
+  background:var(--panel2);
+  border:1px solid var(--line);
+  color:var(--text);
+  border-radius:8px;
+  padding:7px 8px;
+}
+
+.players-table.players-table-ranked{
+  table-layout:fixed;
+  width:100%;
+  font-size:13.5px;
+}
+
+.players-table-ranked col.col-rank{width:6%;}
+.players-table-ranked col.col-player{width:24%;}
+.players-table-ranked col.col-pos{width:7%;}
+.players-table-ranked col.col-posrank{width:8%;}
+.players-table-ranked col.col-tier{width:7%;}
+.players-table-ranked col.col-adp{width:8%;}
+.players-table-ranked col.col-label{width:23%;}
+.players-table-ranked col.col-status{width:17%;}
+
+.players-table-ranked th,
+.players-table-ranked td{
+  padding:7px 8px;
+}
+
+.players-table-ranked th{
+  font-size:12.5px;
+}
+
+.players-table-ranked .player-name-cell b{
+  font-size:14px;
+  font-weight:700;
+}
+
+.players-table-ranked .player-name-cell span{
+  font-size:11px;
+}
+
+.players-table-ranked .label-badge{
+  font-size:11px;
+}
+
+.players-table-ranked .overall-rank-cell,
+.players-table-ranked .pos-rank-cell{
+  font-weight:700;
+  white-space:nowrap;
+}
+
+@media(max-width:1180px){
+  .players-toolbar.players-toolbar-sorted{
+    grid-template-columns:1fr 1fr 1fr;
+  }
+}
+
+@media(max-width:820px){
+  .players-toolbar.players-toolbar-sorted{
+    grid-template-columns:1fr 1fr;
+  }
+
+  .players-table.players-table-ranked{
+    min-width:900px;
+  }
+}
+
+@media(max-width:560px){
+  .players-toolbar.players-toolbar-sorted{
+    grid-template-columns:1fr;
+  }
+}

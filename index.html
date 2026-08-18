@@ -11,7 +11,7 @@
     <title>Draft War Room</title>
 
     <link rel="stylesheet" href="styles.css?v=0.15.2">
-    <link rel="stylesheet" href="layout.css?v=0.15.2">
+    <link rel="stylesheet" href="layout.css?v=0.15.3">
     <link rel="stylesheet" href="quick-select.css?v=0.15.2">
 </head>
 
@@ -107,7 +107,7 @@
 
 
     <div class="build-version">
-        v0.15.2
+        v0.15.4
     </div>
 
 
@@ -188,11 +188,12 @@
     </dialog>
 
 
-   <script>
-    const dwrBuild = Date.now();
+    <script>
+        const dwrBuild = Date.now();
 
         document.write(`<script src="app.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="layout.js?v=${dwrBuild}"><\/script>`);
+        document.write(`<script src="turn-awareness.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="players-sort.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="config.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="ai-engine.js?v=${dwrBuild}"><\/script>`);

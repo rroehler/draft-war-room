@@ -1,32 +1,42 @@
 /* ==========================================================================
-   Draft War Room — AI Decision Engine v1.2
-   Overall Rank + snake-turn awareness for 2026 draft week.
+   Draft War Room — AI Decision Engine v1.3 / app v0.16.0
+   Roster-aware + keeper-aware + positional-depletion intelligence.
    ========================================================================== */
 
 (function(){
-  const AI_API_BASE = String(window.DWR_AI_API_BASE || '').replace(/\/+$/,'');
+  const AI_API_BASE=String(window.DWR_AI_API_BASE||'').replace(/\/+$/,'');
+  const USER='High Roehler';
 
-  function compactPlayer(p){
+  function compactPlayer(player){
     return {
-      id:p.id,
-      name:p.name,
-      team:p.nflTeam,
-      pos:p.position,
-      rank:p.rank || null,
-      posRank:p.posRank || null,
-      tier:p.tier || null,
-      adp:p.adp || null,
-      label:p.ourLabel || 'Unrated',
-      keeper:!!p.isKeeper
+      id:player.id,
+      name:player.name,
+      team:player.nflTeam,
+      pos:player.position,
+      rank:Number(player.rank)||null,
+      posRank:Number(player.posRank)||null,
+      tier:Number(player.tier)||null,
+      adp:Number(player.adp)||null,
+      label:player.ourLabel||'Unrated',
+      keeper:!!player.isKeeper
     };
   }
 
-  function sortAvailable(a,b){
-    const ra=Number(a.rank)||9999, rb=Number(b.rank)||9999;
-    if(ra!==rb) return ra-rb;
-    const ta=Number(a.tier)||99, tb=Number(b.tier)||99;
-    if(ta!==tb) return ta-tb;
-    return (Number(a.adp)||9999)-(Number(b.adp)||9999);
+  function recentDraftPicks(limit=24){
+    return (state.history||[])
+      .filter(entry=>!entry.isKeeper)
+      .slice(-limit)
+      .map(entry=>{
+        const player=(state.players||[]).find(p=>p.id===entry.id);
+        return {
+          manager:entry.manager,
+          player:player?.name||entry.id,
+          pos:player?.position||null,
+          rank:Number(player?.rank)||null,
+          tier:Number(player?.tier)||null,
+          adp:Number(player?.adp)||null
+        };
+      });
   }
 
   function currentKeeperSummary(){
@@ -36,171 +46,56 @@
     for(const manager of MANAGERS){
       const keeper=state.keepers[manager];
       if(!keeper?.playerId) continue;
-      const player=state.players.find(p=>p.id===keeper.playerId);
+
+      const player=(state.players||[]).find(p=>p.id===keeper.playerId);
       if(!player) continue;
+
       result.push({
         manager,
         round:Number(keeper.round)||null,
         player:compactPlayer(player)
       });
     }
+
     return result;
-  }
-
-  function recentDraftPicks(limit=24){
-    return (state.history||[]).slice(-limit).map((h,index)=>{
-      const p=state.players.find(x=>x.id===h.id);
-      return {
-        manager:h.manager,
-        player:p?.name || h.id,
-        pos:p?.position || null,
-        rank:p?.rank || null,
-        posRank:p?.posRank || null,
-        tier:p?.tier || null,
-        adp:p?.adp || null,
-        keeper:!!h.isKeeper
-      };
-    });
-  }
-
-  function recentPositionRun(){
-    const recent=recentDraftPicks(12);
-    const counts=Object.fromEntries(POSITIONS.map(p=>[p,0]));
-    recent.forEach(p=>{
-      if(p.pos && counts[p.pos]!==undefined) counts[p.pos]++;
-    });
-    return counts;
   }
 
   function opponentRosterCounts(){
     return Object.fromEntries(
       MANAGERS
-        .filter(m=>m!=='High Roehler')
-        .map(m=>[m,counts(m)])
+        .filter(manager=>manager!==USER)
+        .map(manager=>[manager,counts(manager)])
     );
   }
 
-  function relevantAvailablePlayers(){
-    const all=state.players.filter(p=>!p.draftedBy).slice().sort(sortAvailable);
-    const chosen=new Map();
-
-    /* Broad overall board */
-    all.slice(0,120).forEach(p=>chosen.set(p.id,p));
-
-    /* Guarantee useful positional depth, even late in the draft. */
-    const limits={QB:16,RB:28,WR:32,TE:16,DP:14,'D/ST':12,K:12};
-
-    for(const [pos,limit] of Object.entries(limits)){
-      all.filter(p=>p.position===pos).slice(0,limit).forEach(p=>chosen.set(p.id,p));
-    }
-
-    return [...chosen.values()].sort(sortAvailable).map(compactPlayer);
+  function fallbackAvailablePlayers(){
+    return (state.players||[])
+      .filter(player=>!player.draftedBy)
+      .slice()
+      .sort((a,b)=>(Number(a.rank)||9999)-(Number(b.rank)||9999))
+      .slice(0,130)
+      .map(compactPlayer);
   }
 
-  function fallbackTurnContext(){
-    const USER='High Roehler';
-    const currentPick=state.currentPick;
-    const currentManager=managerForPick(currentPick);
-    const currentPickIsUser=currentManager===USER;
-
-    const isReserved=pick=>
-      typeof keeperAtPick==='function' && !!keeperAtPick(pick);
-
-    const nextLiveFor=(manager,start)=>{
-      for(let pick=Math.max(1,start);pick<=264;pick++){
-        if(!isReserved(pick) && managerForPick(pick)===manager){
-          return pick;
-        }
-      }
-      return null;
-    };
-
-    const liveBetween=(start,end)=>{
-      const result=[];
-      for(let pick=start;pick<end && pick<=264;pick++){
-        if(isReserved(pick)) continue;
-        result.push({
-          pick,
-          round:roundForPick(pick),
-          manager:managerForPick(pick),
-          reservedKeeper:false
-        });
-      }
-      return result;
-    };
-
-    const start=currentPickIsUser?currentPick+1:currentPick;
-    const nextUserPick=nextLiveFor(USER,start);
-    const beforeNext=nextUserPick
-      ? liveBetween(start,nextUserPick)
-      : [];
-    const oppBeforeNext=beforeNext.filter(p=>p.manager!==USER);
-
-    const currentTurnPicks=[];
-    let followingUserPickAfterTurn=null;
-    let oppBeforeFollowing=[];
-
-    if(currentPickIsUser){
-      currentTurnPicks.push(currentPick);
-      let last=currentPick;
-
-      while(true){
-        const candidate=nextLiveFor(USER,last+1);
-        if(!candidate) break;
-
-        const between=liveBetween(last+1,candidate);
-        const opposing=between.filter(p=>p.manager!==USER);
-
-        if(opposing.length===0){
-          currentTurnPicks.push(candidate);
-          last=candidate;
-        }else{
-          followingUserPickAfterTurn=candidate;
-          oppBeforeFollowing=opposing;
-          break;
-        }
-      }
-    }
-
-    return {
-      currentPick,
-      currentManager,
-      currentPickIsUser,
-      nextUserPick,
-      picksUntilNextUserPick:nextUserPick
-        ? nextUserPick-currentPick
-        : null,
-      livePicksBeforeNextUser:beforeNext,
-      opponentLivePicksBeforeNextUser:oppBeforeNext,
-      opponentLivePickCountBeforeNextUser:oppBeforeNext.length,
-      currentTurnPicks,
-      currentTurnPickCount:currentTurnPicks.length,
-      isBackToBackTurn:currentTurnPicks.length>1,
-      followingUserPickAfterTurn,
-      opponentLivePicksBeforeFollowingTurn:oppBeforeFollowing,
-      opponentLivePickCountBeforeFollowingTurn:oppBeforeFollowing.length
-    };
-  }
-
-  function getTurnContext(){
-    return typeof window.DWR_getUserTurnContext==='function'
-      ? window.DWR_getUserTurnContext()
-      : fallbackTurnContext();
-  }
-
-  function enhancedSnapshotForAI(){
-    const turn=getTurnContext();
-    const nextUserPick=turn.nextUserPick;
-    const currentManager=managerForPick(state.currentPick);
-    const myCounts=counts('High Roehler');
-
-    const missing = typeof missingRequiredPositions==='function'
-      ? missingRequiredPositions('High Roehler')
-      : POSITIONS.filter(pos=>(myCounts[pos]||0)===0);
-
-    const livePicksRemaining = typeof remainingLivePicksFor==='function'
-      ? remainingLivePicksFor('High Roehler')
+  function buildSnapshot(){
+    const intelligence=typeof window.DWR_buildDraftIntelligence==='function'
+      ? window.DWR_buildDraftIntelligence()
       : null;
+
+    const turn=typeof window.DWR_getUserTurnContext==='function'
+      ? window.DWR_getUserTurnContext()
+      : null;
+
+    const decisionCandidates=intelligence?.decisionCandidates?.length
+      ? intelligence.decisionCandidates
+      : fallbackAvailablePlayers();
+
+    let intelligenceSummary=null;
+
+    if(intelligence){
+      const {decisionCandidates:ignored,...rest}=intelligence;
+      intelligenceSummary=rest;
+    }
 
     return {
       league:{
@@ -208,61 +103,73 @@
         teams:12,
         scoring:'Full PPR',
         snake:true,
-        starters:{QB:1,RB:2,WR:3,TE:1,FLEX:1,DP:1,'D/ST':1,K:1},
+        starters:{
+          QB:1,
+          RB:2,
+          WR:3,
+          TE:1,
+          FLEX:1,
+          DP:1,
+          'D/ST':1,
+          K:1
+        },
+        flexEligible:['RB','WR','TE'],
         benchSlots:11,
-        rosterTargets:{...state.targets},
-        requiredAtLeastOne:['QB','RB','WR','TE','DP','D/ST','K'],
-        keeperRule:'One keeper from round 4 or later with a two-round penalty; waiver keeper costs round 10. Pre-Draft state contains the actual announced keeper and cost.'
+        rosterTargets:{...(state.targets||{})},
+        keeperRule:'One keeper from round 4 or later with a two-round penalty; waiver pickup costs round 10. Keeper selections occupy their reserved round and are not live draft picks.'
       },
 
       strategy:{
-        team:'High Roehler',
+        team:USER,
         commandments:[...COMMANDMENTS],
-        priorities:[
-          'Use Overall Rank as the primary cross-position value board. Tier marks value cliffs, Our Label adds conviction/context, Position Rank gives within-position context, and ADP mainly estimates whether a player will survive.',
-          'Do not force a preset positional round plan.',
-          'Three starting WR plus FLEX makes WR depth important, but do not pass superior value.',
-          'Do not chase runs automatically; decide whether to join or exploit them.',
-          'Late in the draft, every required position must be filled at least once.',
-          'Past manager tendencies are weak evidence only; do not assume this year repeats prior drafts.'
+        decisionHierarchy:[
+          'Hard draft/lineup feasibility and valid availability first.',
+          'Marginal lineup value and roster construction second: fixed starter > FLEX > bench depth unless a real value/tier exception justifies deviating.',
+          'Keeper leverage matters: a premium keeper at a one-starter position sharply lowers the marginal value of spending early capital at that same position.',
+          'Overall Rank is the baseline cross-position board, but it is not an autopick list. Dynamic roster fit can override small rank differences.',
+          'Tier cliffs and positional depletion matter more than tiny Overall Rank gaps.',
+          'ADP estimates market timing only. It is not player value.',
+          'Observed runs and opponent roster needs are evidence, not certainty.'
+        ],
+        formatSpecific:[
+          'This is a 3-WR full-PPR league. WR has three fixed starting slots before FLEX; one rostered WR does not mean WR is covered.',
+          'Do not repeatedly add RB depth while multiple WR fixed starter slots remain open unless the RB represents a genuine tier/value exception.',
+          'QB and TE are one-starter positions. Once filled by a strong option, early duplication has high opportunity cost.',
+          'DP, D/ST, and K are required by the end, but normally should not displace core offensive value early or in the middle rounds.'
         ]
       },
 
       draft:{
-        mode:state.draftMode || 'mock',
+        mode:state.draftMode||'mock',
         currentPick:state.currentPick,
         currentRound:roundForPick(state.currentPick),
-        currentManager,
+        currentManager:managerForPick(state.currentPick),
         draftOrder:[...state.draftOrder],
-        nextUserPick,
-        picksUntilUser:turn.picksUntilNextUserPick,
-        managersBeforeNextUserPick:turn.livePicksBeforeNextUser,
         userTurn:turn,
         recentPicks:recentDraftPicks(24),
-        recent12PositionCounts:recentPositionRun(),
         keepers:currentKeeperSummary()
       },
 
       highRoehler:{
-        roster:roster('High Roehler').map(compactPlayer),
-        counts:myCounts,
-        missingRequiredPositions:missing,
-        livePicksRemaining
+        roster:roster(USER).map(compactPlayer),
+        counts:counts(USER)
       },
 
       opponents:{
         rosterCounts:opponentRosterCounts()
       },
 
-      availablePlayers:relevantAvailablePlayers()
+      intelligence:intelligenceSummary,
+
+      /* The backend may recommend only an exact name from this list. */
+      availablePlayers:decisionCandidates
     };
   }
 
-  /* Override the original lightweight snapshot. */
-  snapshotForAI = enhancedSnapshotForAI;
+  snapshotForAI=buildSnapshot;
 
   async function callAI(payload){
-    if(!AI_API_BASE || AI_API_BASE.includes('YOUR-VERCEL-PROJECT')){
+    if(!AI_API_BASE||AI_API_BASE.includes('YOUR-VERCEL-PROJECT')){
       throw new Error('AI backend URL is not configured yet. Update config.js after the Vercel deployment.');
     }
 
@@ -280,17 +187,17 @@
     }
 
     if(!response.ok){
-      throw new Error(data.error || `AI request failed (${response.status}).`);
+      throw new Error(data.error||`AI request failed (${response.status}).`);
     }
 
     return data;
   }
 
-  getRecommendation = async function(){
-    const btn=document.getElementById('recommendBtn');
-    if(btn){
-      btn.disabled=true;
-      btn.textContent='Thinking…';
+  getRecommendation=async function(){
+    const button=document.getElementById('recommendBtn');
+    if(button){
+      button.disabled=true;
+      button.textContent='Thinking…';
     }
 
     try{
@@ -313,7 +220,7 @@
     }
   };
 
-  sendChat = async function(){
+  sendChat=async function(){
     const input=document.getElementById('chatInput');
     const message=input?.value.trim();
     if(!message) return;
@@ -338,5 +245,12 @@
     renderChat();
   };
 
-  console.log('Draft War Room AI Decision Engine v1.2 — Overall Rank + snake-turn awareness loaded.');
+  /* Re-render after overriding the click handlers so existing DOM buttons point
+     at the v0.16.0 AI functions even when localStorage caused an early sync render. */
+  if(typeof state!=='undefined' && state?.players?.length){
+    if(typeof renderWarRoom==='function') renderWarRoom();
+    if(typeof renderChat==='function') renderChat();
+  }
+
+  console.log('Draft War Room AI Decision Engine v1.3 / v0.16.0 loaded.');
 })();

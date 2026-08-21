@@ -10,6 +10,15 @@
 
     <title>Draft War Room</title>
 
+    <meta name="theme-color" content="#07101f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Draft War Room">
+
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/icon-180.png">
+
     <link rel="stylesheet" href="styles.css?v=0.15.2">
     <link rel="stylesheet" href="layout.css?v=0.15.3">
     <link rel="stylesheet" href="quick-select.css?v=0.15.2">
@@ -116,7 +125,7 @@
 
 
     <div class="build-version">
-        v0.18.4
+        v0.18.5
     </div>
 
 
@@ -211,6 +220,7 @@
         document.write(`<script src="draft-recap.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="toolbar-menu.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="decision-tree.js?v=${dwrBuild}"><\/script>`);
+        document.write(`<script src="pwa.js?v=${dwrBuild}"><\/script>`);
     </script>
 
 </body>

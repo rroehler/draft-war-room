@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Draft War Room — Pick Decision Coach v0.18.4
+   Draft War Room — Pick Decision Coach v0.18.5
 
    High-effort rebuild of the War Room decision layer.
 
@@ -1277,7 +1277,7 @@
     const style=document.createElement('style');
     style.id='dwrDecisionCoachStyles';
     style.textContent=`
-      /* v0.18.4 — separate Decision and Tiers tabs */
+      /* v0.18.5 — separate Decision and Tiers tabs */
 
       #war-room .decision-tab-layout{
         display:grid;
@@ -2318,7 +2318,7 @@
   }
 
   window.DWR_DecisionCoach={
-    version:'0.18.4',
+    version:'0.18.5',
     rosterRules:ROSTER_RULES,
     decisionRules:DECISION_RULES,
     buildRosterBudgetFromCounts,
@@ -2328,5 +2328,5 @@
     renderTiers
   };
 
-  console.log('Draft War Room Pick Decision Coach v0.18.4 loaded.');
+  console.log('Draft War Room Pick Decision Coach v0.18.5 loaded.');
 })();

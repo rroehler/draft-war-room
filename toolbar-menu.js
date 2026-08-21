@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Draft War Room — Header Toolbar Menu v0.16.7
+   Draft War Room — Header Toolbar Menu v0.18.4
 
    Purpose:
    - Keep high-frequency draft controls visible.
@@ -77,7 +77,7 @@
         right:0;
         top:calc(100% + 8px);
         z-index:10000;
-        min-width:190px;
+        min-width:180px;
         padding:6px;
         border:1px solid #334155;
         border-radius:10px;
@@ -184,7 +184,7 @@
     const panel=document.getElementById('headerMorePanel');
     if(!panel) return;
 
-    const newMock=document.getElementById('newMockBtn');
+    const newMock=document.getElementById('newMockBtn') || document.getElementById('resetBtn');
     const undoSim=document.getElementById('undoSimulationBtn');
     const command=document.getElementById('commandmentsBtn');
     const recap=document.getElementById('draftRecapBtn');
@@ -309,5 +309,5 @@
 
   window.DWR_syncToolbar=syncToolbar;
 
-  console.log('Draft War Room Header Toolbar Menu v0.16.7 loaded.');
+  console.log('Draft War Room Header Toolbar Menu v0.18.4 loaded.');
 })();

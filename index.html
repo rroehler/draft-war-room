@@ -60,6 +60,11 @@
         </section>
 
         <section
+            id="tiers"
+            class="page">
+        </section>
+
+        <section
             id="players"
             class="page">
         </section>
@@ -85,7 +90,11 @@
         <button
             data-page="war-room"
             class="active">
-            War Room
+            Decision
+        </button>
+
+        <button data-page="tiers">
+            Tiers
         </button>
 
         <button data-page="players">
@@ -107,7 +116,7 @@
 
 
     <div class="build-version">
-        v0.16.7
+        v0.18.4
     </div>
 
 
@@ -201,6 +210,7 @@
         document.write(`<script src="draft-simulator.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="draft-recap.js?v=${dwrBuild}"><\/script>`);
         document.write(`<script src="toolbar-menu.js?v=${dwrBuild}"><\/script>`);
+        document.write(`<script src="decision-tree.js?v=${dwrBuild}"><\/script>`);
     </script>
 
 </body>

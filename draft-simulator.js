@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Draft War Room — Opponent Draft Simulator v0.16.3
+   Draft War Room — Opponent Draft Simulator v0.16.4
 
    Purpose:
    - Simulate realistic opponent selections locally during MOCK drafts.
@@ -13,6 +13,13 @@
 (function(){
   const USER_MANAGER='High Roehler';
   const LAST_DRAFT_PICK=264;
+  const SIM_PICK_DELAY_MS=3000;
+
+  let simulationInProgress=false;
+
+  function wait(ms){
+    return new Promise(resolve=>setTimeout(resolve,ms));
+  }
 
   const STARTER_REQUIREMENTS={
     QB:1,
@@ -811,7 +818,8 @@
     return picks;
   }
 
-  function simulateToMyPick(){
+  async function simulateToMyPick(){
+    if(simulationInProgress) return [];
     if(!simulationAllowed()) return [];
 
     advanceReservedKeeperPicks();
@@ -828,41 +836,102 @@
     const simulated=[];
     let safety=0;
 
-    while(
-      state.currentPick<=LAST_DRAFT_PICK &&
-      managerForPick(state.currentPick)!==USER_MANAGER &&
-      safety<80
-    ){
-      safety++;
-      advanceReservedKeeperPicks();
+    simulationInProgress=true;
+    state.simulationLastBatch=null;
+    refreshSimulatorControls();
 
-      if(state.currentPick>LAST_DRAFT_PICK) break;
-      if(managerForPick(state.currentPick)===USER_MANAGER) break;
+    try{
+      while(
+        state.currentPick<=LAST_DRAFT_PICK &&
+        managerForPick(state.currentPick)!==USER_MANAGER &&
+        safety<80
+      ){
+        safety++;
 
-      const manager=managerForPick(state.currentPick);
-      const player=choosePlayerForManager(manager,state.currentPick);
-      if(!player) break;
+        /*
+          Keeper-reserved selections are not live picks, so move across them
+          immediately. The next real opponent pick still gets the full 3-second
+          viewing window.
+        */
+        const beforeKeeperSkip=state.currentPick;
+        advanceReservedKeeperPicks();
 
-      const result=assignSimulatedPick(player,manager);
-      if(!result) break;
-      simulated.push(result);
+        if(state.currentPick!==beforeKeeperSkip){
+          save();
+          renderAll();
+          refreshSimulatorControls();
+        }
+
+        if(state.currentPick>LAST_DRAFT_PICK) break;
+        if(managerForPick(state.currentPick)===USER_MANAGER) break;
+
+        const manager=managerForPick(state.currentPick);
+        const player=choosePlayerForManager(manager,state.currentPick);
+        if(!player) break;
+
+        const result=assignSimulatedPick(player,manager);
+        if(!result) break;
+
+        simulated.push(result);
+
+        /*
+          Persist and render after EVERY opponent selection. This is the key
+          training behavior: the user gets a live-looking draft room for three
+          seconds before the next player comes off the board.
+        */
+        save();
+        renderAll();
+        refreshSimulatorControls();
+
+        if(typeof showDraftActivity==='function'){
+          showDraftActivity(
+            `SIM · #${result.pick} ${result.manager} drafted ${result.player}, ${result.position}`,
+            'draft'
+          );
+        }
+
+        /*
+          Keep each completed live pick visible for a full three seconds.
+          Do not wait after the final opponent selection once High Roehler is
+          already on the clock.
+        */
+        if(
+          state.currentPick<=LAST_DRAFT_PICK &&
+          managerForPick(state.currentPick)!==USER_MANAGER
+        ){
+          await wait(SIM_PICK_DELAY_MS);
+        }
+      }
+
+      if(simulated.length){
+        state.simulationLastBatch={
+          historyLengthBefore,
+          historyLengthAfter:state.history.length,
+          startPick,
+          endPick:state.currentPick,
+          picks:simulated
+        };
+
+        save();
+        renderAll();
+        announceSimulation(simulated);
+      }
+
+      return simulated;
+    }finally{
+      simulationInProgress=false;
+      refreshSimulatorControls();
+
+      /*
+        renderAll() may have recreated the header controls while the async loop
+        was running. Refresh once more after the flag changes so the final
+        buttons always return to their normal state.
+      */
+      if(typeof renderAll==='function'){
+        renderAll();
+      }
+      refreshSimulatorControls();
     }
-
-    if(simulated.length){
-      state.simulationLastBatch={
-        historyLengthBefore,
-        historyLengthAfter:state.history.length,
-        startPick,
-        endPick:state.currentPick,
-        picks:simulated
-      };
-
-      save();
-      renderAll();
-      announceSimulation(simulated);
-    }
-
-    return simulated;
   }
 
   function canUndoLastSimulation(){
@@ -953,6 +1022,7 @@
     style.textContent=`
       #simToMyPickBtn.sim-ready{font-weight:700}
       #simToMyPickBtn:disabled,#undoSimulationBtn:disabled{opacity:.45;cursor:not-allowed}
+      #simToMyPickBtn:disabled{white-space:nowrap}
       #undoSimulationBtn{white-space:nowrap}
     `;
     document.head.appendChild(style);
@@ -968,15 +1038,27 @@
       state.currentPick<=LAST_DRAFT_PICK &&
       managerForPick(state.currentPick)===USER_MANAGER;
 
-    sim.disabled=isLive || userOnClock || state.currentPick>LAST_DRAFT_PICK;
-    sim.classList.toggle('sim-ready',!sim.disabled);
-    sim.title=isLive
-      ? 'Disabled during Live Draft mode'
-      : userOnClock
-        ? 'Make High Roehler\'s pick first'
-        : 'Simulate realistic opponent picks until High Roehler is on the clock';
+    sim.disabled=
+      simulationInProgress ||
+      isLive ||
+      userOnClock ||
+      state.currentPick>LAST_DRAFT_PICK;
 
-    undo.disabled=!canUndoLastSimulation();
+    sim.textContent=simulationInProgress
+      ? 'Simulating…'
+      : 'Sim to My Pick';
+
+    sim.classList.toggle('sim-ready',!sim.disabled);
+
+    sim.title=simulationInProgress
+      ? 'Opponent picks are advancing one at a time every 3 seconds'
+      : isLive
+        ? 'Disabled during Live Draft mode'
+        : userOnClock
+          ? 'Make High Roehler\'s pick first'
+          : 'Simulate realistic opponent picks one at a time until High Roehler is on the clock';
+
+    undo.disabled=simulationInProgress || !canUndoLastSimulation();
   }
 
   function ensureSimulatorControls(){
@@ -989,7 +1071,14 @@
       sim=document.createElement('button');
       sim.id='simToMyPickBtn';
       sim.textContent='Sim to My Pick';
-      sim.onclick=simulateToMyPick;
+      sim.onclick=()=>{
+        simulateToMyPick().catch(error=>{
+          console.error('Timed simulation failed.',error);
+          simulationInProgress=false;
+          refreshSimulatorControls();
+          alert(error?.message || 'Timed simulation failed.');
+        });
+      };
 
       const anchor=document.getElementById('headerUndoBtn');
       if(anchor) actions.insertBefore(sim,anchor);
@@ -1032,10 +1121,11 @@
   }
 
   window.DWR_simulator={
-    version:'0.16.2',
+    version:'0.16.4',
     choosePlayerForManager,
     managerProfile,
     simulatorProfiles,
+    pickDelayMs:SIM_PICK_DELAY_MS,
     simulateOneOpponentPick,
     simulateToMyPick,
     undoLastSimulation,
@@ -1044,5 +1134,5 @@
 
   ensureSimulatorControls();
 
-  console.log('Draft War Room Opponent Draft Simulator v0.16.3 loaded.');
+  console.log('Draft War Room Opponent Draft Simulator v0.16.4 loaded.');
 })();

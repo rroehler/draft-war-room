@@ -1377,22 +1377,25 @@
     const style=document.createElement('style');
     style.id='dwrDecisionCoachStyles';
     style.textContent=`
-      /* v0.18.6 — separate Decision and Tiers tabs */
+      /* v0.18.9 — side-by-side Decision and tracker */
 
       #war-room .decision-tab-layout{
         display:grid;
-        grid-template-columns:minmax(430px,1.1fr) minmax(340px,.9fr);
+        grid-template-columns:minmax(760px,1.45fr) minmax(380px,.82fr);
         grid-template-rows:minmax(0,1fr);
-        gap:14px;
-        height:calc(100vh - 174px);
-        min-height:590px;
+        gap:16px;
+        height:calc(100vh - 166px);
+        min-height:650px;
         overflow:hidden;
       }
 
       .decision-left-stack{
         display:grid;
-        grid-template-rows:auto minmax(190px,1fr);
-        gap:12px;
+        grid-template-columns:minmax(0,1.18fr) minmax(320px,.82fr);
+        grid-template-rows:auto;
+        align-items:start;
+        align-content:start;
+        gap:14px;
         min-width:0;
         min-height:0;
       }
@@ -1405,8 +1408,11 @@
       }
 
       .decision-main-card{
-        padding:18px 20px;
-        overflow:auto;
+        display:flex;
+        flex-direction:column;
+        justify-content:flex-start;
+        padding:20px 22px;
+        overflow:visible;
       }
 
       .decision-tracker-card{
@@ -1414,14 +1420,14 @@
         flex-direction:column;
         min-height:0;
         margin:0;
-        padding:16px 18px;
-        overflow:hidden;
+        padding:18px 20px;
+        overflow:visible;
       }
 
       .decision-tracker-label{
-        margin-bottom:10px;
+        margin-bottom:12px;
         color:var(--muted);
-        font-size:8px;
+        font-size:10px;
         font-weight:900;
         letter-spacing:.09em;
         text-transform:uppercase;
@@ -1431,8 +1437,8 @@
         display:grid;
         grid-template-columns:auto minmax(0,1fr);
         align-items:center;
-        gap:16px;
-        padding-bottom:12px;
+        gap:18px;
+        padding-bottom:14px;
         border-bottom:1px solid var(--line);
       }
 
@@ -1444,21 +1450,21 @@
 
       .decision-tracker-pick span{
         color:var(--muted);
-        font-size:8px;
+        font-size:10px;
         text-transform:uppercase;
         letter-spacing:.06em;
       }
 
       .decision-tracker-pick strong{
-        margin-top:1px;
-        font-size:38px;
-        line-height:.95;
+        margin-top:2px;
+        font-size:46px;
+        line-height:.92;
       }
 
       .decision-tracker-owner strong{
         display:block;
-        font-size:21px;
-        line-height:1.05;
+        font-size:24px;
+        line-height:1.02;
       }
 
       .decision-tracker-owner strong.user-pick{
@@ -1467,9 +1473,9 @@
 
       .decision-tracker-owner span{
         display:block;
-        margin-top:4px;
+        margin-top:5px;
         color:var(--muted);
-        font-size:10px;
+        font-size:12px;
       }
 
       .decision-tracker-next{
@@ -1478,35 +1484,35 @@
         justify-content:space-between;
         gap:12px;
         margin-top:11px;
-        padding:9px 10px;
-        border-radius:7px;
+        padding:10px 12px;
+        border-radius:9px;
         background:rgba(109,168,255,.07);
       }
 
       .decision-tracker-next span{
         color:var(--muted);
-        font-size:8px;
+        font-size:10px;
         text-transform:uppercase;
         letter-spacing:.05em;
       }
 
       .decision-tracker-next strong{
-        font-size:12px;
+        font-size:15px;
         text-align:right;
       }
 
       .decision-upcoming{
         display:grid;
         grid-template-rows:auto repeat(4,minmax(0,1fr));
-        gap:5px;
+        gap:6px;
         flex:1;
         min-height:0;
-        margin-top:12px;
+        margin-top:11px;
       }
 
       .decision-upcoming-title{
         color:var(--muted);
-        font-size:8px;
+        font-size:10px;
         font-weight:900;
         letter-spacing:.07em;
         text-transform:uppercase;
@@ -1514,13 +1520,13 @@
 
       .decision-upcoming-row{
         display:grid;
-        grid-template-columns:50px minmax(0,1fr) auto;
+        grid-template-columns:58px minmax(0,1fr) auto;
         align-items:center;
-        gap:9px;
+        gap:10px;
         min-height:0;
-        padding:5px 8px;
+        padding:6px 8px;
         border-bottom:1px solid rgba(148,163,184,.16);
-        font-size:10px;
+        font-size:12px;
       }
 
       .decision-upcoming-row:last-child{
@@ -1550,80 +1556,80 @@
 
       .decision-upcoming-round{
         color:var(--muted);
-        font-size:8px;
+        font-size:10px;
       }
 
       .decision-roster-card{
         display:flex;
         flex-direction:column;
         overflow-y:auto;
-        padding:13px 15px;
+        padding:18px 18px;
       }
 
       .decision-hero{
         display:grid;
         grid-template-columns:auto minmax(0,1fr) auto;
         align-items:center;
-        gap:14px;
+        gap:18px;
         padding-bottom:14px;
         border-bottom:1px solid var(--line);
       }
 
       .decision-pick-badge{
-        width:64px;
-        height:64px;
+        width:78px;
+        height:78px;
         display:flex;
         flex-direction:column;
         align-items:center;
         justify-content:center;
         border:1px solid rgba(109,168,255,.45);
-        border-radius:10px;
+        border-radius:12px;
         background:rgba(109,168,255,.08);
       }
 
       .decision-pick-badge span{
         color:var(--muted);
-        font-size:9px;
+        font-size:11px;
         text-transform:uppercase;
         letter-spacing:.08em;
       }
 
       .decision-pick-badge strong{
-        margin-top:2px;
-        font-size:24px;
+        margin-top:3px;
+        font-size:31px;
         line-height:1;
       }
 
       .decision-hero-kicker{
         color:var(--muted);
-        font-size:10px;
-        margin-bottom:3px;
+        font-size:12px;
+        margin-bottom:4px;
       }
 
       .decision-hero-title{
-        font-size:clamp(28px,2.2vw,38px);
+        font-size:clamp(36px,2.8vw,50px);
         line-height:1;
         font-weight:900;
       }
 
       .decision-chat-button{
-        padding:7px 10px;
-        font-size:10px;
+        padding:10px 14px;
+        font-size:12px;
       }
 
       .pressure-strip{
         display:grid;
         grid-template-columns:repeat(4,minmax(0,1fr));
-        margin-top:15px;
+        margin-top:14px;
         border:1px solid var(--line);
-        border-radius:9px;
+        border-radius:10px;
         overflow:hidden;
         background:rgba(7,16,31,.28);
       }
 
       .pressure-tile{
         min-width:0;
-        padding:9px 10px 8px;
+        padding:10px 12px 9px;
         border-top:3px solid transparent;
       }
 
@@ -1638,17 +1644,17 @@
         gap:6px;
       }
 
-      .pressure-tile-top strong{font-size:13px}
+      .pressure-tile-top strong{font-size:16px}
 
       .pressure-tile-top span{
-        font-size:7px;
+        font-size:8px;
         font-weight:900;
       }
 
       .pressure-tile-bottom{
-        margin-top:3px;
+        margin-top:5px;
         color:var(--muted);
-        font-size:9px;
+        font-size:11px;
         white-space:nowrap;
         overflow:hidden;
         text-overflow:ellipsis;
@@ -1681,41 +1687,41 @@
       .pressure-closed{opacity:.5;border-top-color:#7f8ca5}
 
       .decision-alert{
-        margin-top:16px;
-        padding:13px 15px;
+        margin-top:14px;
+        padding:15px 17px;
         border-left:4px solid var(--accent);
-        border-radius:0 8px 8px 0;
+        border-radius:0 10px 10px 0;
         background:rgba(109,168,255,.07);
       }
 
       .decision-alert-eyebrow{
         display:block;
-        margin-bottom:3px;
+        margin-bottom:5px;
         color:var(--accent);
-        font-size:8px;
+        font-size:10px;
         font-weight:900;
         text-transform:uppercase;
       }
 
       .decision-alert strong{
         display:block;
-        font-size:18px;
+        font-size:28px;
       }
 
       .decision-alert p{
-        margin:5px 0 0;
+        margin:7px 0 0;
         color:#dce5f5;
-        font-size:11px;
-        line-height:1.3;
+        font-size:14px;
+        line-height:1.4;
       }
 
       .room-pulse-line{
         display:flex;
         align-items:center;
-        gap:10px;
-        margin-top:11px;
+        gap:12px;
+        margin-top:10px;
         color:var(--muted);
-        font-size:9px;
+        font-size:11px;
       }
 
       .room-pulse-line b{
@@ -1730,76 +1736,80 @@
       }
 
       .decision-roster-card > .section-title{
-        margin-bottom:9px;
-        padding-bottom:7px;
+        margin-bottom:11px;
+        padding-bottom:9px;
         border-bottom:1px solid var(--line);
       }
 
+      .decision-roster-card .section-title h3{font-size:20px}
+
       .decision-budget-sticky{
         position:relative;
-        padding:0 0 9px;
-        margin-bottom:3px;
+        padding:0 0 11px;
+        margin-bottom:6px;
         background:transparent;
       }
 
       .budget-metrics{
         display:grid;
         grid-template-columns:repeat(3,1fr);
-        gap:5px;
-        margin-bottom:7px;
+        gap:7px;
+        margin-bottom:9px;
       }
 
       .budget-metrics > div{
-        padding:6px 4px;
+        padding:9px 6px;
         text-align:center;
         border:1px solid var(--line);
-        border-radius:6px;
+        border-radius:8px;
         background:rgba(255,255,255,.025);
       }
 
       .budget-metrics strong{
         display:block;
-        font-size:15px;
+        font-size:21px;
       }
 
       .budget-metrics span{
         display:block;
-        margin-top:3px;
+        margin-top:4px;
         color:var(--muted);
-        font-size:7px;
+        font-size:10px;
         text-transform:uppercase;
+        letter-spacing:.05em;
       }
 
       .budget-strips{display:grid;gap:2px}
 
       .budget-strip{
         display:grid;
-        grid-template-columns:42px 1fr auto;
-        gap:7px;
+        grid-template-columns:60px 1fr auto;
+        gap:12px;
         align-items:center;
-        min-height:25px;
-        padding:3px 7px;
-        border-radius:5px;
-        font-size:9px;
+        min-height:40px;
+        padding:6px 11px;
+        border-radius:7px;
+        font-size:13px;
       }
 
-      .budget-strip-count{text-align:center}
-      .budget-strip-status{font-size:7px;font-weight:900}
+      .budget-strip-pos{font-size:15px;letter-spacing:.02em}
+      .budget-strip-count{text-align:center;font-size:15px;font-weight:700}
+      .budget-strip-status{font-size:11px;font-weight:900;letter-spacing:.04em}
       .budget-red{background:rgba(255,107,122,.18);color:#ffd7dc}
       .budget-yellow{background:rgba(255,200,87,.18);color:#ffe6a7}
       .budget-green{background:rgba(85,214,139,.17);color:#c8f8da}
       .budget-closed{background:rgba(148,163,184,.14);color:#c8ced8}
 
       .budget-summary{
-        margin-top:5px;
-        padding:5px 6px;
+        margin-top:8px;
+        padding:9px 10px;
         text-align:center;
-        border-radius:6px;
-        font-size:8px;
+        border-radius:8px;
+        font-size:12px;
       }
 
       .decision-roster-card .lineup-slot{
-        min-height:26px;
+        min-height:38px;
         border:0;
         border-bottom:1px solid rgba(148,163,184,.18);
         border-radius:0;
@@ -1807,17 +1817,56 @@
       }
 
       .decision-roster-card .lineup-pos{
-        min-height:25px;
+        min-height:36px;
         border-right:0;
         background:transparent;
         color:var(--accent);
         justify-content:flex-start;
-        font-size:8px;
+        font-size:12px;
+        font-weight:800;
       }
 
       .decision-roster-card .lineup-player{
-        padding:4px 2px;
-        font-size:10px;
+        padding:7px 4px;
+        font-size:14px;
+      }
+
+      /* Draft Board readability bump */
+      #draft-board .section-title .muted{
+        font-size:14px;
+      }
+
+      #draft-board .manager-summary{
+        font-size:12px;
+        line-height:1.5;
+      }
+
+      #draft-board .collapse-manager-btn{
+        padding:7px 10px;
+        font-size:12px;
+      }
+
+      #draft-board .collapse-bench-btn{
+        padding:5px 8px;
+        font-size:11px;
+      }
+
+      #draft-board .bench-divider{
+        font-size:11px;
+      }
+
+      #draft-board .lineup-slot{
+        min-height:34px;
+      }
+
+      #draft-board .lineup-pos{
+        min-height:30px;
+        font-size:11px;
+      }
+
+      #draft-board .lineup-player{
+        padding:6px 8px;
+        font-size:13px;
       }
 
       /* Tiers tab */
@@ -2000,6 +2049,17 @@
         margin-top:9px;
       }
 
+      @media(max-width:1180px){
+        #war-room .decision-tab-layout{
+          grid-template-columns:minmax(0,1fr) minmax(340px,.78fr);
+        }
+
+        .decision-left-stack{
+          grid-template-columns:1fr;
+          grid-template-rows:auto auto;
+        }
+      }
+
       @media(max-width:1250px){
         .tiers-tab-columns{gap:5px}
         .tier-tab-card{padding:6px 4px}
@@ -2013,10 +2073,6 @@
           grid-template-columns:1fr;
           height:auto;
           overflow:visible;
-        }
-
-        .decision-left-stack{
-          grid-template-rows:auto auto;
         }
 
         #tiers .tiers-tab-shell{
@@ -2420,7 +2476,7 @@
   }
 
   window.DWR_DecisionCoach={
-    version:'0.18.6',
+    version:'0.18.8',
     rosterRules:ROSTER_RULES,
     decisionRules:DECISION_RULES,
     buildRosterBudgetFromCounts,
@@ -2430,5 +2486,5 @@
     renderTiers
   };
 
-  console.log('Draft War Room Pick Decision Coach v0.18.6 loaded.');
+  console.log('Draft War Room Pick Decision Coach v0.18.9 loaded.');
 })();

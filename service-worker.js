@@ -1,4 +1,4 @@
-const CACHE_NAME = 'draft-war-room-v0.18.6';
+const CACHE_NAME = 'draft-war-room-v0.19.0';
 
 const APP_SHELL = [
   './',
@@ -19,6 +19,7 @@ const APP_SHELL = [
   './draft-recap.js',
   './toolbar-menu.js',
   './decision-tree.js',
+  './live-sync.js',
   './pwa.js',
   './icons/icon-180.png',
   './icons/icon-192.png',

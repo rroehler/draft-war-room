@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Draft War Room — Header Toolbar Menu v0.18.6
+   Draft War Room — Header Toolbar Menu v0.18.7
 
    Purpose:
    - Keep high-frequency draft controls visible.
@@ -309,5 +309,5 @@
 
   window.DWR_syncToolbar=syncToolbar;
 
-  console.log('Draft War Room Header Toolbar Menu v0.18.6 loaded.');
+  console.log('Draft War Room Header Toolbar Menu v0.18.7 loaded.');
 })();

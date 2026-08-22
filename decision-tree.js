@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Draft War Room — Pick Decision Coach v0.18.5
+   Draft War Room — Pick Decision Coach v0.18.6
 
    High-effort rebuild of the War Room decision layer.
 
@@ -24,6 +24,106 @@
 (function(){
   const USER='High Roehler';
   const LAST_DRAFT_PICK=264;
+
+
+  /*
+    FINAL PRESEASON PLAYER DATA — 2026-08-22
+
+    players.json already contains these changes for a fresh browser/install.
+    This migration exists only so a laptop/tablet with an older player database
+    saved in localStorage gets the same board without clearing draft settings.
+  */
+  const FINAL_PLAYER_DATA_VERSION='2026-08-22-preseason-final';
+
+  const FINAL_OUT_FOR_SEASON=new Set([
+    'ricky-pearsall',
+    'jayden-higgins'
+  ]);
+
+  const FINAL_RANK_MOVES=[
+    {id:'chris-olave',         target:20,  tier:'2'},
+    {id:'javonte-williams',    target:35,  tier:'3'},
+    {id:'jeremiyah-love',      target:39,  tier:'3'},
+    {id:'emeka-egbuka',        target:41,  tier:'3'},
+    {id:'travis-etienne-jr',   target:45,  tier:'3'},
+    {id:'rhamondre-stevenson', target:72,  tier:'4'},
+    {id:'sam-laporta',         target:73,  tier:'3'},
+    {id:'jonathon-brooks',     target:90,  tier:'4'},
+    {id:'chuba-hubbard',       target:95,  tier:'4'},
+    {id:'george-kittle',       target:100, tier:'3'},
+    {id:'stefon-diggs',        target:105, tier:'4',nflTeam:'WAS'},
+    {id:'jordyn-tyson',        target:130, tier:'5'},
+    {id:'alvin-kamara',        target:150, tier:'5'},
+    {id:'de-zhaun-stribling',  target:153, tier:'5'}
+  ];
+
+  const FINAL_TEAM_UPDATES={
+    'deebo-samuel-sr':'SF'
+  };
+
+  function applyFinalPlayerData(){
+    if(
+      typeof state==='undefined' ||
+      !state ||
+      !Array.isArray(state.players) ||
+      !state.players.length ||
+      state.playerDataVersion===FINAL_PLAYER_DATA_VERSION
+    ){
+      return false;
+    }
+
+    let players=state.players.filter(
+      player=>!FINAL_OUT_FOR_SEASON.has(player.id)
+    );
+
+    players.forEach(player=>{
+      const team=FINAL_TEAM_UPDATES[player.id];
+      if(team) player.nflTeam=team;
+    });
+
+    const moveIds=new Set(FINAL_RANK_MOVES.map(move=>move.id));
+    const moved=new Map();
+
+    players.forEach(player=>{
+      if(moveIds.has(player.id)){
+        moved.set(player.id,player);
+      }
+    });
+
+    let board=players
+      .filter(player=>!moveIds.has(player.id))
+      .sort((a,b)=>(Number(a.rank)||9999)-(Number(b.rank)||9999));
+
+    [...FINAL_RANK_MOVES]
+      .sort((a,b)=>a.target-b.target)
+      .forEach(move=>{
+        const player=moved.get(move.id);
+        if(!player) return;
+
+        player.tier=String(move.tier);
+        if(move.nflTeam) player.nflTeam=move.nflTeam;
+
+        const index=Math.max(0,Math.min(board.length,move.target-1));
+        board.splice(index,0,player);
+      });
+
+    const positionCounters={};
+
+    board.forEach((player,index)=>{
+      player.rank=index+1;
+      positionCounters[player.position]=(positionCounters[player.position]||0)+1;
+      player.posRank=positionCounters[player.position];
+    });
+
+    state.players=board;
+    state.playerDataVersion=FINAL_PLAYER_DATA_VERSION;
+
+    if(typeof save==='function'){
+      save();
+    }
+
+    return true;
+  }
 
   const CORE_POSITIONS=['QB','RB','WR','TE'];
   const ALL_POSITIONS=['QB','RB','WR','TE','DP','D/ST','K'];
@@ -1277,7 +1377,7 @@
     const style=document.createElement('style');
     style.id='dwrDecisionCoachStyles';
     style.textContent=`
-      /* v0.18.5 — separate Decision and Tiers tabs */
+      /* v0.18.6 — separate Decision and Tiers tabs */
 
       #war-room .decision-tab-layout{
         display:grid;
@@ -2304,12 +2404,14 @@
     const renderAllBeforeTiers=renderAll;
 
     renderAll=function(){
+      applyFinalPlayerData();
       renderAllBeforeTiers();
       renderTiers();
     };
   }
 
   applyDecisionRulesToCommandments();
+  applyFinalPlayerData();
 
   if(typeof state!=='undefined' && state?.players?.length){
     renderWarRoom();
@@ -2318,7 +2420,7 @@
   }
 
   window.DWR_DecisionCoach={
-    version:'0.18.5',
+    version:'0.18.6',
     rosterRules:ROSTER_RULES,
     decisionRules:DECISION_RULES,
     buildRosterBudgetFromCounts,
@@ -2328,5 +2430,5 @@
     renderTiers
   };
 
-  console.log('Draft War Room Pick Decision Coach v0.18.5 loaded.');
+  console.log('Draft War Room Pick Decision Coach v0.18.6 loaded.');
 })();

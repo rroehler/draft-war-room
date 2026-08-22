@@ -1,8 +1,9 @@
-const CACHE_NAME = 'draft-war-room-v0.18.5';
+const CACHE_NAME = 'draft-war-room-v0.18.6';
 
 const APP_SHELL = [
   './',
   './index.html',
+  './players.json',
   './manifest.webmanifest',
   './styles.css',
   './layout.css',

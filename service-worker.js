@@ -1,4 +1,4 @@
-const CACHE_NAME = 'draft-war-room-v0.19.0';
+const CACHE_NAME = 'draft-war-room-v0.19.1';
 
 const APP_SHELL = [
   './',

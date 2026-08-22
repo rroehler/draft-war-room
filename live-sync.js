@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Draft War Room — Cross-Device Live Sync v0.19.0
+   Draft War Room — Cross-Device Live Sync v0.19.1
 
    Purpose
    ---------------------------------------------------------------------------
@@ -72,13 +72,24 @@
 
   function authHeaders(extra={}){
     const key=String(config.supabaseKey||'').trim();
-
-    return {
+    const headers={
       apikey:key,
-      Authorization:`Bearer ${key}`,
       Accept:'application/json',
       ...extra
     };
+
+    /*
+      Supabase's new sb_publishable_* keys are API keys, not JWTs.
+      They belong in the `apikey` header and must NOT be sent as
+      `Authorization: Bearer ...`.
+
+      Legacy anon keys are JWTs, so keep Bearer support for those.
+    */
+    if(key.startsWith('eyJ')){
+      headers.Authorization=`Bearer ${key}`;
+    }
+
+    return headers;
   }
 
   function getDeviceId(){
@@ -526,7 +537,7 @@
   }
 
   window.DWR_LiveSync={
-    version:'0.19.0',
+    version:'0.19.1',
     getStatus(){
       return {
         enabled:validConfig(),
